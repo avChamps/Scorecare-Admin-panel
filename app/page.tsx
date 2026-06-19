@@ -1380,14 +1380,15 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/send-otp`, {
+      const response = await fetch(`${API_BASE_URL}/auth/admin/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobileNumber: mobile }),
       });
+      const result = await response.json();
 
       if (!response.ok) {
-        throw new Error("Unable to send OTP");
+        throw new Error(result.message || "Unable to send OTP");
       }
 
       sessionStorage.setItem("scorecare_otp_mobile", mobile);
@@ -1411,14 +1412,15 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/send-otp`, {
+      const response = await fetch(`${API_BASE_URL}/auth/admin/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobileNumber: otpMobile }),
       });
+      const result = await response.json();
 
       if (!response.ok) {
-        throw new Error("Unable to resend OTP");
+        throw new Error(result.message || "Unable to resend OTP");
       }
 
       setOtp("");
@@ -2661,7 +2663,12 @@ export default function Home() {
           </div>
           <label htmlFor="mobile">Mobile Number</label>
           <div className="auth-field">
-            <span className="country-code">🇮🇳 +91</span>
+            <span className="country-code">
+              <span className="india-flag" aria-hidden="true">
+                <span />
+              </span>
+              +91
+            </span>
             <input
               id="mobile"
               required

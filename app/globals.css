@@ -166,11 +166,36 @@ select {
 }
 
 .auth-field .country-code {
+  align-items: center;
   color: #111827;
+  display: flex;
   flex: 0 0 82px;
   font-size: 14px;
   font-weight: 800;
+  gap: 8px;
   width: auto;
+}
+
+.auth-field .india-flag {
+  background: linear-gradient(to bottom, #ff9933 0 33.33%, #ffffff 33.33% 66.66%, #138808 66.66% 100%);
+  border: 1px solid rgba(17, 24, 39, 0.16);
+  border-radius: 2px;
+  display: inline-flex;
+  flex: 0 0 22px;
+  height: 15px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  width: 22px;
+}
+
+.auth-field .india-flag span {
+  align-self: center;
+  border: 1px solid #000080;
+  border-radius: 50%;
+  display: block;
+  height: 5px;
+  width: 5px;
 }
 
 .auth-box input {
