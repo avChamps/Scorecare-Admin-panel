@@ -352,15 +352,55 @@ select {
 }
 
 .sidebar button {
+  align-items: center;
   background: transparent;
   border-radius: 10px;
   color: #536071;
+  display: flex;
   font-size: 14px;
   font-weight: 700;
+  gap: 10px;
   padding: 12px 16px;
   position: relative;
   text-align: left;
   transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  width: 100%;
+}
+
+.menu-icon {
+  display: inline-flex;
+  flex: 0 0 20px;
+  justify-content: center;
+}
+
+.menu-icon svg {
+  fill: none;
+  height: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+  width: 18px;
+}
+
+.sidebar-group {
+  display: grid;
+  gap: 6px;
+}
+
+.sidebar-group-toggle .sidebar-chevron {
+  margin-left: auto;
+}
+
+.sidebar-submenu {
+  display: grid;
+  gap: 4px;
+  padding-left: 26px;
+}
+
+.sidebar-submenu button {
+  font-size: 13px;
+  padding: 10px 12px;
 }
 
 .sidebar button:hover,
@@ -1248,6 +1288,13 @@ select {
   font-size: 14px;
 }
 
+.faq-question-top {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 120px 90px;
+}
+
 .faq-question-row {
   align-items: end;
   display: grid;
@@ -1257,9 +1304,13 @@ select {
 
 .faq-checkbox {
   align-items: center;
+  align-self: end;
   display: flex;
   gap: 8px;
   height: 44px;
+  justify-content: flex-start;
+  padding-bottom: 10px;
+  white-space: nowrap;
 }
 
 .faq-checkbox input {
@@ -1300,7 +1351,7 @@ select {
 }
 
 .faq-add-question {
-  justify-self: start;
+  justify-self: end;
 }
 
 .empty-state {
@@ -2035,6 +2086,10 @@ select {
   .panel-header {
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .faq-question-top {
+    grid-template-columns: 1fr;
   }
 
   .revenue-panel .panel-header {

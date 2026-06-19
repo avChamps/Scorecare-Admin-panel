@@ -1,11 +1,71 @@
 "use client";
 
-import { ClipboardEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { ClipboardEvent, FormEvent, Fragment, KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { API_BASE_URL } from "./api/api";
 
-const menuItems = ["Dashboard", "General", "Plans & Benefits", "Users", "Subscriptions", "Loans", "Chat", "FAQs", "Feedback"];
+const menuItems = ["Dashboard", "Plans & Benefits", "Users", "Subscriptions", "Loans", "Chat", "Feedback"];
+const menuIcons: Record<string, ReactNode> = {
+  Dashboard: (
+    <svg viewBox="0 0 24 24">
+      <path d="M4 4h6v8H4zM14 4h6v4h-6zM14 12h6v8h-6zM4 16h6v4H4z" />
+    </svg>
+  ),
+  General: (
+    <svg viewBox="0 0 24 24">
+      <path d="M10.3 4.3 11 2h2l.7 2.3 1.7.7 2.1-1.1 1.4 1.4-1.1 2.1.7 1.7L21 10v2l-2.3.7-.7 1.7 1.1 2.1-1.4 1.4-2.1-1.1-1.7.7L13 22h-2l-.7-2.3-1.7-.7-2.1 1.1-1.4-1.4 1.1-2.1-.7-1.7L3 12v-2l2.3-.7.7-1.7-1.1-2.1 1.4-1.4L8.6 5z" />
+      <path d="M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0" />
+    </svg>
+  ),
+  "Site Settings": (
+    <svg viewBox="0 0 24 24">
+      <path d="M4 5h16v12H4z" />
+      <path d="M4 9h16M8 21h8M10 17l-1 4M14 17l1 4" />
+    </svg>
+  ),
+  "Plans & Benefits": (
+    <svg viewBox="0 0 24 24">
+      <path d="M4 11h16v9H4zM4 11a4 4 0 0 1 4-4c2 0 4 4 4 4s2-4 4-4a4 4 0 0 1 4 4M12 7v13M4 15h16" />
+    </svg>
+  ),
+  Users: (
+    <svg viewBox="0 0 24 24">
+      <path d="M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8" />
+      <path d="M3 21v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1M16 3.1a4 4 0 0 1 0 7.8M21 21v-1a4 4 0 0 0-3-3.85" />
+    </svg>
+  ),
+  Subscriptions: (
+    <svg viewBox="0 0 24 24">
+      <path d="M4 7h16v10H4zM4 11h16" />
+      <path d="M8 15h3" />
+    </svg>
+  ),
+  Loans: (
+    <svg viewBox="0 0 24 24">
+      <path d="M14 3H6v18h12V7z" />
+      <path d="M14 3v4h4M9 13h5a2 2 0 0 1 0 4h-2M12 11v8" />
+    </svg>
+  ),
+  Chat: (
+    <svg viewBox="0 0 24 24">
+      <path d="M5 6h14v10H8l-3 3z" />
+      <path d="M9 10h6M9 13h4" />
+    </svg>
+  ),
+  FAQ: (
+    <svg viewBox="0 0 24 24">
+      <path d="M12 19v.01" />
+      <path d="M12 15a2 2 0 0 1 1-1.7 3 3 0 1 0-4-2.8" />
+      <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />
+    </svg>
+  ),
+  Feedback: (
+    <svg viewBox="0 0 24 24">
+      <path d="m12 3 2.6 5.4 5.9.8-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.2 5.9-.8z" />
+    </svg>
+  ),
+};
 const loanTypeOptions = [
   { label: "Personal Loan", value: "personal" },
   { label: "Overdraft Loan", value: "overdraft" },
@@ -291,6 +351,7 @@ export default function Home() {
   const [isSessionChecking, setIsSessionChecking] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isGeneralMenuOpen, setIsGeneralMenuOpen] = useState(true);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [activeView, setActiveView] = useState<AppView>("Dashboard");
   const [usersData, setUsersData] = useState<UsersResponse | null>(null);
@@ -1656,14 +1717,37 @@ export default function Home() {
           </div>
           <nav>
             {menuItems.map((item) => (
-              <button
-                className={activeView === item ? "active" : ""}
-                key={item}
-                type="button"
-                onClick={() => openAdminView(item as AppView)}
-              >
-                {item}
-              </button>
+              <Fragment key={item}>
+                <button
+                  className={activeView === item ? "active" : ""}
+                  type="button"
+                  onClick={() => openAdminView(item as AppView)}
+                >
+                  <span className="menu-icon">{menuIcons[item]}</span>
+                  {item}
+                </button>
+                {item === "Dashboard" ? (
+                  <div className={`sidebar-group ${activeView === "General" || activeView === "FAQs" ? "active" : ""}`}>
+                    <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
+                      <span className="menu-icon">{menuIcons.General}</span>
+                      General
+                      <span className="sidebar-chevron">{isGeneralMenuOpen ? "⌄" : "›"}</span>
+                    </button>
+                    {isGeneralMenuOpen ? (
+                      <div className="sidebar-submenu">
+                        <button className={activeView === "General" ? "active" : ""} type="button" onClick={() => openAdminView("General")}>
+                          <span className="menu-icon">{menuIcons["Site Settings"]}</span>
+                          Site Settings
+                        </button>
+                        <button className={activeView === "FAQs" ? "active" : ""} type="button" onClick={() => openAdminView("FAQs")}>
+                          <span className="menu-icon">{menuIcons.FAQ}</span>
+                          FAQ
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </Fragment>
             ))}
           </nav>
         </aside>
@@ -1706,7 +1790,7 @@ export default function Home() {
                     <h2>General</h2>
                     <p>Manage website contact settings</p>
                   </div>
-                  <span>{isGeneralLoading ? "Loading..." : "Settings"}</span>
+                  {/* <span>{isGeneralLoading ? "Loading..." : "Settings"}</span> */}
                 </section>
 
                 {generalError ? <p className="dashboard-error">{generalError}</p> : null}
@@ -1774,7 +1858,7 @@ export default function Home() {
                     <h2>FAQs</h2>
                     <p>Manage app FAQ categories and questions</p>
                   </div>
-                  <span>{faqCategories.length} categories</span>
+                  {/* <span>{faqCategories.length} categories</span> */}
                 </section>
 
                 {faqsError ? <p className="dashboard-error">{faqsError}</p> : null}
@@ -1851,23 +1935,15 @@ export default function Home() {
                               Remove
                             </button>
                           </div>
-                          <label>
-                            Question
-                            <input
-                              required
-                              value={question.question}
-                              onChange={(event) => updateFaqQuestion(categoryIndex, questionIndex, "question", event.target.value)}
-                            />
-                          </label>
-                          <label>
-                            Answer
-                            <textarea
-                              required
-                              value={question.answer}
-                              onChange={(event) => updateFaqQuestion(categoryIndex, questionIndex, "answer", event.target.value)}
-                            />
-                          </label>
-                          <div className="faq-question-row">
+                          <div className="faq-question-top">
+                            <label>
+                              Question
+                              <input
+                                required
+                                value={question.question}
+                                onChange={(event) => updateFaqQuestion(categoryIndex, questionIndex, "question", event.target.value)}
+                              />
+                            </label>
                             <label>
                               Order
                               <input
@@ -1879,14 +1955,22 @@ export default function Home() {
                               />
                             </label>
                             <label className="faq-checkbox">
+                              Active
                               <input
                                 checked={question.isActive}
                                 type="checkbox"
                                 onChange={(event) => updateFaqQuestion(categoryIndex, questionIndex, "isActive", event.target.checked)}
                               />
-                              Active
                             </label>
                           </div>
+                          <label>
+                            Answer
+                            <textarea
+                              required
+                              value={question.answer}
+                              onChange={(event) => updateFaqQuestion(categoryIndex, questionIndex, "answer", event.target.value)}
+                            />
+                          </label>
                         </div>
                       ))}
 
