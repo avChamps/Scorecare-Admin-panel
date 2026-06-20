@@ -3075,6 +3075,136 @@ select {
   width: 100%;
 }
 
+.manual-report-form {
+  display: grid;
+  gap: 22px;
+  max-width: 760px;
+  padding: 24px;
+}
+
+.manual-report-download-toolbar {
+  grid-template-columns: minmax(220px, 1fr) 140px 150px 150px 44px auto;
+}
+
+.manual-report-bureaus {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.manual-report-bureaus legend,
+.manual-report-fields label {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.manual-report-bureaus legend {
+  margin-bottom: 9px;
+}
+
+.manual-report-bureaus > div {
+  background: #eef3fa;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  display: inline-grid;
+  gap: 4px;
+  grid-template-columns: repeat(3, minmax(100px, 1fr));
+  padding: 4px;
+}
+
+.manual-report-bureaus button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #52627a;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  height: 38px;
+  padding: 0 18px;
+}
+
+.manual-report-bureaus button.active {
+  background: #1769e0;
+  box-shadow: 0 3px 10px rgba(23, 105, 224, 0.2);
+  color: #ffffff;
+}
+
+.manual-report-fields {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manual-report-fields label {
+  display: grid;
+  gap: 8px;
+}
+
+.manual-report-wide-field {
+  grid-column: 1 / -1;
+}
+
+.manual-report-fields input,
+.manual-report-fields select {
+  background: #f8f9ff;
+  border: 1px solid #dfe3fb;
+  border-radius: 8px;
+  color: #1f2937;
+  height: 44px;
+  outline: none;
+  padding: 0 14px;
+}
+
+.manual-report-fields input:focus,
+.manual-report-fields select:focus {
+  border-color: #1769e0;
+  box-shadow: 0 0 0 3px rgba(23, 105, 224, 0.1);
+}
+
+.manual-report-consent {
+  align-items: flex-start;
+  color: #475569;
+  display: flex;
+  font-size: 13px;
+  gap: 10px;
+  line-height: 1.45;
+}
+
+.manual-report-consent input {
+  accent-color: #1769e0;
+  flex: 0 0 auto;
+  height: 16px;
+  margin: 2px 0 0;
+  width: 16px;
+}
+
+.manual-report-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.manual-report-actions button {
+  align-items: center;
+  background: #1769e0;
+  border: 1px solid #1769e0;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 800;
+  height: 44px;
+  justify-content: center;
+  padding: 0 20px;
+}
+
+.manual-report-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 @media (max-width: 1100px) {
   .stats-grid,
   .dashboard-grid,
@@ -3380,6 +3510,14 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .manual-report-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-report-wide-field {
+    grid-column: auto;
+  }
+
   .admin-plan-grid.compact {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3560,6 +3698,28 @@ select {
   .plan-modal p,
   .modal-actions button {
     font-size: 12px;
+  }
+
+  .manual-report-form {
+    gap: 18px;
+    padding: 16px;
+  }
+
+  .manual-report-bureaus > div {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .manual-report-bureaus button,
+  .manual-report-fields label,
+  .manual-report-consent {
+    font-size: 12px;
+  }
+
+  .manual-report-actions button {
+    font-size: 13px;
+    width: 100%;
   }
 }
 

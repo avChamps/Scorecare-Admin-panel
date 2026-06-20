@@ -220,7 +220,9 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report";
+
+type ManualReportType = "experian" | "cibil" | "crif";
 
 type UserMenuAccess = {
   menuName: string;
@@ -246,6 +248,7 @@ const viewRoutes: Record<AppView, string> = {
   "Contact Us": "/contact-us",
   "Report Downloads": "/reports/downloads",
   "Download CIBIL": "/reports/download-cibil",
+  "Manual Report": "/reports/manual-report",
 };
 
 const routeViews: Record<string, AppView> = {
@@ -261,6 +264,7 @@ const routeViews: Record<string, AppView> = {
   "/contact-us": "Contact Us",
   "/reports/downloads": "Report Downloads",
   "/reports/download-cibil": "Download CIBIL",
+  "/reports/manual-report": "Manual Report",
   "/users": "Users",
   "/employees": "Employees",
   "/roles": "Roles",
@@ -287,6 +291,7 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   "Contact Us": { menuName: "Contact Us", childMenuName: null },
   "Report Downloads": { menuName: "Reports", childMenuName: "Downloads" },
   "Download CIBIL": { menuName: "Reports", childMenuName: "Download CIBIL" },
+  "Manual Report": { menuName: "Reports", childMenuName: "Manual Report" },
 };
 
 type ActionIconType = "add" | "edit" | "delete" | "back";
@@ -625,6 +630,36 @@ type CreditReportDownloadsResponse = {
   };
 };
 
+type ManualCreditReportDownload = {
+  id: string;
+  type: ManualReportType;
+  clientId: string;
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  mobile: string;
+  pan: string;
+  gender: string | null;
+  creditScore: string | null;
+  creditReportLink: string | null;
+  hasPdf: boolean;
+  providerStatusCode: number | null;
+  providerMessage: string | null;
+  downloadedByUserName: string | null;
+  downloadedByEmployeeName: string | null;
+  downloadedAt: string;
+};
+
+type ManualCreditReportDownloadsResponse = {
+  downloads: ManualCreditReportDownload[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 type EmployeeRow = {
   id?: number;
   publicId: string;
@@ -933,6 +968,27 @@ export default function Home() {
   const [cibilUsersError, setCibilUsersError] = useState("");
   const [isCibilUsersLoading, setIsCibilUsersLoading] = useState(false);
   const [downloadingCibilUserId, setDownloadingCibilUserId] = useState<string | null>(null);
+  const [manualReportForm, setManualReportForm] = useState({
+    type: "experian" as ManualReportType,
+    name: "",
+    firstName: "",
+    lastName: "",
+    mobile: "",
+    pan: "",
+    gender: "male",
+    consent: false,
+  });
+  const [manualReportError, setManualReportError] = useState("");
+  const [isManualReportDownloading, setIsManualReportDownloading] = useState(false);
+  const [manualReportTab, setManualReportTab] = useState<"download" | "downloads">("download");
+  const [manualReportDownloadsData, setManualReportDownloadsData] = useState<ManualCreditReportDownloadsResponse | null>(null);
+  const [manualReportDownloadsSearch, setManualReportDownloadsSearch] = useState("");
+  const [manualReportDownloadsType, setManualReportDownloadsType] = useState("");
+  const [manualReportDownloadsFromDate, setManualReportDownloadsFromDate] = useState("");
+  const [manualReportDownloadsToDate, setManualReportDownloadsToDate] = useState("");
+  const [manualReportDownloadsError, setManualReportDownloadsError] = useState("");
+  const [isManualReportDownloadsLoading, setIsManualReportDownloadsLoading] = useState(false);
+  const [downloadingManualReportId, setDownloadingManualReportId] = useState<string | null>(null);
   const [employeesData, setEmployeesData] = useState<EmployeesResponse | null>(null);
   const [employeesSearch, setEmployeesSearch] = useState("");
   const [employeesStatus, setEmployeesStatus] = useState("");
@@ -1186,15 +1242,20 @@ export default function Home() {
   }
 
   function hasViewPermission(view: AppView, accessList = userMenuAccess) {
+    const hasReadAccess = (permissions: string[]) =>
+      permissions.some((permission) => ["view", "read"].includes(permission.toLowerCase()));
+
     if (view === "Plans & Benefits") {
       return accessList.some(
         (access) =>
           access.menuName.toLowerCase() === viewAccessMap[view].menuName.toLowerCase() &&
-          access.permissions.some((permission) => permission.toLowerCase() === "view")
+          hasReadAccess(access.permissions)
       );
     }
 
-    return Boolean(getAccessForView(view, accessList)?.permissions.some((permission) => permission.toLowerCase() === "view"));
+    const access = getAccessForView(view, accessList);
+
+    return Boolean(access && hasReadAccess(access.permissions));
   }
 
   function hasActionPermission(view: AppView, permission: string, accessList = userMenuAccess) {
@@ -1438,6 +1499,137 @@ export default function Home() {
       showToast("error", error instanceof Error ? error.message : "Unable to download CIBIL report");
     } finally {
       setDownloadingCibilUserId(null);
+    }
+  }
+
+  async function loadManualReportDownloads(
+    page = 1,
+    search = manualReportDownloadsSearch,
+    type = manualReportDownloadsType,
+    from = manualReportDownloadsFromDate,
+    to = manualReportDownloadsToDate
+  ) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setManualReportDownloadsError("");
+      setIsManualReportDownloadsLoading(true);
+      const params = new URLSearchParams({ page: String(page), limit: "20" });
+
+      if (search) params.set("search", search);
+      if (type) params.set("type", type);
+      if (from) params.set("from", from);
+      if (to) params.set("totime", to);
+
+      const response = await fetch(`${API_BASE_URL}/admin/manual-credit-report-downloads?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load manual report downloads");
+      }
+
+      setManualReportDownloadsData(result.data);
+    } catch (error) {
+      setManualReportDownloadsError(error instanceof Error ? error.message : "Unable to load manual report downloads");
+    } finally {
+      setIsManualReportDownloadsLoading(false);
+    }
+  }
+
+  async function downloadManualReportFile(download: ManualCreditReportDownload) {
+    if (!download.creditReportLink) {
+      showToast("error", "Report download link is unavailable");
+      return;
+    }
+
+    try {
+      setDownloadingManualReportId(download.id);
+      const response = await fetch(download.creditReportLink);
+
+      if (!response.ok) {
+        throw new Error("Report download link has expired");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `${download.clientId || `${download.type}-credit-report`}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      const link = document.createElement("a");
+
+      link.href = download.creditReportLink;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+    } finally {
+      setDownloadingManualReportId(null);
+    }
+  }
+
+  async function downloadManualCreditReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token || !manualReportForm.consent) {
+      return;
+    }
+
+    const commonPayload = {
+      type: manualReportForm.type,
+      mobile: manualReportForm.mobile,
+      pan: manualReportForm.pan,
+      consent: "Y",
+    };
+    const payload = manualReportForm.type === "crif"
+      ? { ...commonPayload, firstName: manualReportForm.firstName, lastName: manualReportForm.lastName }
+      : {
+        ...commonPayload,
+        name: manualReportForm.name,
+        ...(manualReportForm.type === "cibil" ? { gender: manualReportForm.gender } : {}),
+      };
+
+    try {
+      setManualReportError("");
+      setIsManualReportDownloading(true);
+      const response = await fetch(`${API_BASE_URL}/admin/download-manual-cibil-report`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.message || result?.errors?.[0] || "Unable to download credit report");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const disposition = response.headers.get("content-disposition") || "";
+      const fileName = disposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i)?.[1];
+
+      link.href = url;
+      link.download = fileName ? decodeURIComponent(fileName) : `${manualReportForm.type}-credit-report.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setManualReportDownloadsData(null);
+      showToast("success", "Credit report downloaded successfully");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to download credit report";
+      setManualReportError(message);
+      showToast("error", message);
+    } finally {
+      setIsManualReportDownloading(false);
     }
   }
 
@@ -3179,6 +3371,14 @@ export default function Home() {
     loadCibilUsers(1, "", "", "");
   }
 
+  function resetManualReportDownloadFilters() {
+    setManualReportDownloadsSearch("");
+    setManualReportDownloadsType("");
+    setManualReportDownloadsFromDate("");
+    setManualReportDownloadsToDate("");
+    loadManualReportDownloads(1, "", "", "", "");
+  }
+
   function toggleNotificationUser(publicId: string) {
     setSelectedNotificationUserIds((ids) =>
       ids.includes(publicId) ? ids.filter((id) => id !== publicId) : [...ids, publicId]
@@ -3394,7 +3594,7 @@ export default function Home() {
       setIsEmployeeManagementMenuOpen(routeView === "Employees" || routeView === "Roles");
       setIsSubscriptionsMenuOpen(routeView === "Subscriptions");
       setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits");
-      setIsReportsMenuOpen(routeView === "Report Downloads" || routeView === "Download CIBIL");
+      setIsReportsMenuOpen(routeView === "Report Downloads" || routeView === "Download CIBIL" || routeView === "Manual Report");
 
       if (routeView === "Plans & Benefits") {
         setPlansBenefitsTab("repair");
@@ -3485,6 +3685,12 @@ export default function Home() {
       loadCibilUsers();
     }
   }, [activeView, adminUser?.token, cibilUsersData, isCibilUsersLoading]);
+
+  useEffect(() => {
+    if (activeView === "Manual Report" && manualReportTab === "downloads" && adminUser?.token && !manualReportDownloadsData && !isManualReportDownloadsLoading) {
+      loadManualReportDownloads();
+    }
+  }, [activeView, manualReportTab, adminUser?.token, manualReportDownloadsData, isManualReportDownloadsLoading]);
 
   useEffect(() => {
     if (activeView === "Employees" && adminUser?.token && !employeesData && !isEmployeesLoading) {
@@ -3784,6 +3990,7 @@ export default function Home() {
       isDashboardLoading ||
       isUsersLoading ||
       isReportDownloadsLoading ||
+      isManualReportDownloadsLoading ||
       isCibilUsersLoading ||
       isEmployeesLoading ||
       isEmployeeSaving ||
@@ -3865,6 +4072,7 @@ export default function Home() {
     const canCreatePlans = hasActionPermission("Plans & Benefits", "create");
     const canUpdatePlans = hasActionPermission("Plans & Benefits", "update");
     const canDeletePlans = hasActionPermission("Plans & Benefits", "delete");
+    const canCreateManualReport = hasActionPermission("Manual Report", "create");
     const canExportUsers = hasActionPermission("Users", "export");
     const canCreateEmployees = hasActionPermission("Employees", "create");
     const canUpdateEmployees = hasActionPermission("Employees", "update");
@@ -3923,6 +4131,31 @@ export default function Home() {
       download.creditScore || "-",
       formatDate(download.reportFetchedAt),
       formatDate(download.downloadedAt),
+    ]) ?? [];
+    const manualReportDownloadColumns = ["Bureau", "Name", "Mobile", "PAN", "Credit Score", "PDF", "Downloaded By", "Downloaded At", "Action"];
+    const manualReportDownloadRows = manualReportDownloadsData?.downloads.map((download) => [
+      download.type.toUpperCase(),
+      download.name || `${download.firstName || ""} ${download.lastName || ""}`.trim() || "-",
+      download.mobile,
+      download.pan,
+      download.creditScore || "-",
+      download.hasPdf ? "Available" : "Unavailable",
+      download.downloadedByEmployeeName || download.downloadedByUserName || "-",
+      formatDate(download.downloadedAt),
+      <button
+        aria-label={`Download ${download.type.toUpperCase()} report`}
+        className="table-action download-report-action"
+        disabled={!download.creditReportLink || downloadingManualReportId === download.id}
+        title="Download report"
+        type="button"
+        onClick={() => downloadManualReportFile(download)}
+      >
+        {downloadingManualReportId === download.id ? <span className="api-loader" /> : (
+          <svg className="button-icon" viewBox="0 0 24 24">
+            <path d="M12 3v12M7 10l5 5 5-5M5 20h14" />
+          </svg>
+        )}
+      </button>,
     ]) ?? [];
     const employeeColumns = [
       "Code",
@@ -4241,8 +4474,8 @@ export default function Home() {
                         ) : null}
                       </div>
                     ) : null}
-                    {hasViewPermission("Report Downloads") || hasViewPermission("Download CIBIL") ? (
-                      <div className={`sidebar-group ${activeView === "Report Downloads" || activeView === "Download CIBIL" ? "active" : ""}`}>
+                    {hasViewPermission("Report Downloads") || hasViewPermission("Download CIBIL") || hasViewPermission("Manual Report") ? (
+                      <div className={`sidebar-group ${activeView === "Report Downloads" || activeView === "Download CIBIL" || activeView === "Manual Report" ? "active" : ""}`}>
                         <button className="sidebar-group-toggle" type="button" onClick={() => setIsReportsMenuOpen((current) => !current)}>
                           <span className="menu-icon">{menuIcons.Reports}</span>
                           Reports
@@ -4252,6 +4485,7 @@ export default function Home() {
                           <div className="sidebar-submenu">
                             {hasViewPermission("Report Downloads") ? <button className={activeView === "Report Downloads" ? "active" : ""} type="button" onClick={() => openAdminView("Report Downloads")}><span className="menu-icon">{menuIcons.Reports}</span>Downloads</button> : null}
                             {hasViewPermission("Download CIBIL") ? <button className={activeView === "Download CIBIL" ? "active" : ""} type="button" onClick={() => openAdminView("Download CIBIL")}><span className="menu-icon">{menuIcons.Reports}</span>Download CIBIL</button> : null}
+                            {hasViewPermission("Manual Report") ? <button className={activeView === "Manual Report" ? "active" : ""} type="button" onClick={() => openAdminView("Manual Report")}><span className="menu-icon">{menuIcons.Reports}</span>Manual Report</button> : null}
                           </div>
                         ) : null}
                       </div>
@@ -5167,6 +5401,147 @@ export default function Home() {
                   }
                   rows={cibilUserRows}
                 />
+              </>
+            ) : activeView === "Manual Report" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Manual Credit Report</h2>
+                    <p>Fetch and download a bureau credit report</p>
+                  </div>
+                  {manualReportTab === "downloads" ? <span>{manualReportDownloadsData?.pagination.total ?? 0} downloads</span> : null}
+                </section>
+
+                <section className="section-tabs" aria-label="Manual report views">
+                  <button className={manualReportTab === "download" ? "active" : ""} type="button" onClick={() => setManualReportTab("download")}>Download</button>
+                  <button className={manualReportTab === "downloads" ? "active" : ""} type="button" onClick={() => setManualReportTab("downloads")}>History</button>
+                </section>
+
+                {manualReportTab === "download" ? (
+                  <>
+                    {manualReportError ? <p className="dashboard-error">{manualReportError}</p> : null}
+
+                    <form className="manual-report-form panel" onSubmit={downloadManualCreditReport}>
+                  <fieldset className="manual-report-bureaus">
+                    <legend>Credit Bureau</legend>
+                    <div>
+                      {(["experian", "cibil", "crif"] as ManualReportType[]).map((type) => (
+                        <button
+                          className={manualReportForm.type === type ? "active" : ""}
+                          key={type}
+                          type="button"
+                          onClick={() => setManualReportForm((form) => ({ ...form, type }))}
+                        >
+                          {type === "cibil" ? "CIBIL" : type.charAt(0).toUpperCase() + type.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <div className="manual-report-fields">
+                    {manualReportForm.type === "crif" ? (
+                      <>
+                        <label>
+                          First Name
+                          <input required value={manualReportForm.firstName} onChange={(event) => setManualReportForm((form) => ({ ...form, firstName: event.target.value }))} />
+                        </label>
+                        <label>
+                          Last Name
+                          <input required value={manualReportForm.lastName} onChange={(event) => setManualReportForm((form) => ({ ...form, lastName: event.target.value }))} />
+                        </label>
+                      </>
+                    ) : (
+                      <label className="manual-report-wide-field">
+                        Full Name
+                        <input required value={manualReportForm.name} onChange={(event) => setManualReportForm((form) => ({ ...form, name: event.target.value }))} />
+                      </label>
+                    )}
+
+                    <label>
+                      Mobile Number
+                      <input
+                        required
+                        inputMode="numeric"
+                        maxLength={10}
+                        pattern="[6-9][0-9]{9}"
+                        value={manualReportForm.mobile}
+                        onChange={(event) => setManualReportForm((form) => ({ ...form, mobile: event.target.value.replace(/\D/g, "") }))}
+                      />
+                    </label>
+                    <label>
+                      PAN Number
+                      <input
+                        required
+                        maxLength={10}
+                        pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
+                        value={manualReportForm.pan}
+                        onChange={(event) => setManualReportForm((form) => ({ ...form, pan: event.target.value.toUpperCase() }))}
+                      />
+                    </label>
+                    {manualReportForm.type === "cibil" ? (
+                      <label>
+                        Gender
+                        <select value={manualReportForm.gender} onChange={(event) => setManualReportForm((form) => ({ ...form, gender: event.target.value }))}>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+
+                  <label className="manual-report-consent">
+                    <input required checked={manualReportForm.consent} type="checkbox" onChange={(event) => setManualReportForm((form) => ({ ...form, consent: event.target.checked }))} />
+                    I confirm that the customer has provided consent to fetch this credit report.
+                  </label>
+
+                  {canCreateManualReport ? (
+                    <div className="manual-report-actions">
+                      <button disabled={isManualReportDownloading || !manualReportForm.consent} type="submit">
+                        <svg className="button-icon" viewBox="0 0 24 24">
+                          <path d="M12 3v12M7 10l5 5 5-5M5 20h14" />
+                        </svg>
+                        {isManualReportDownloading ? "Downloading..." : "Download Report"}
+                      </button>
+                    </div>
+                  ) : null}
+                    </form>
+                  </>
+                ) : (
+                  <>
+                    <div className="mobile-toolbar-actions single">
+                      <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>Filter</button>
+                    </div>
+
+                    <section className={`table-toolbar manual-report-download-toolbar ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
+                      <input placeholder="Search downloads..." value={manualReportDownloadsSearch} onChange={(event) => setManualReportDownloadsSearch(event.target.value)} />
+                      <select value={manualReportDownloadsType} onChange={(event) => setManualReportDownloadsType(event.target.value)}>
+                        <option value="">All bureaus</option>
+                        <option value="experian">Experian</option>
+                        <option value="cibil">CIBIL</option>
+                        <option value="crif">CRIF</option>
+                      </select>
+                      <DateFilter label="Start date" value={manualReportDownloadsFromDate} onChange={setManualReportDownloadsFromDate} />
+                      <DateFilter label="End date" value={manualReportDownloadsToDate} onChange={setManualReportDownloadsToDate} />
+                      <button className="icon-button" title="Reset filters" type="button" onClick={resetManualReportDownloadFilters}>↻</button>
+                      <button type="button" onClick={() => loadManualReportDownloads(1)}>Search</button>
+                    </section>
+
+                    {manualReportDownloadsError ? <p className="dashboard-error">{manualReportDownloadsError}</p> : null}
+
+                    <CommonTable
+                      columns={manualReportDownloadColumns}
+                      emptyText={isManualReportDownloadsLoading ? "Loading downloads..." : "No manual report downloads found"}
+                      isLoading={isManualReportDownloadsLoading}
+                      pagination={manualReportDownloadsData ? {
+                        page: manualReportDownloadsData.pagination.page,
+                        totalPages: manualReportDownloadsData.pagination.totalPages,
+                        onPrevious: () => loadManualReportDownloads(manualReportDownloadsData.pagination.page - 1),
+                        onNext: () => loadManualReportDownloads(manualReportDownloadsData.pagination.page + 1),
+                      } : undefined}
+                      rows={manualReportDownloadRows}
+                    />
+                  </>
+                )}
               </>
             ) : activeView === "Users" ? (
               <>
