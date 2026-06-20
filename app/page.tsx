@@ -900,6 +900,7 @@ export default function Home() {
   const [dashboardError, setDashboardError] = useState("");
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [isSessionChecking, setIsSessionChecking] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -3358,6 +3359,13 @@ export default function Home() {
   }
 
   useEffect(() => {
+    setCurrentTime(new Date());
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 560px)");
 
     function syncSidebar() {
@@ -4235,7 +4243,15 @@ export default function Home() {
             </div>
             {/* <div className="search-box">⌕ <span>Search here...</span></div> */}
             <div className="topbar-profile">
-              <span>🔔</span>
+              <div className="current-time" aria-label="Current time">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18" />
+                </svg>
+                <div>
+                  <strong>{currentTime ? currentTime.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }) : "--:--:--"}</strong>
+                </div>
+              </div>
+              <span className="topbar-bell">{menuIcons.Notifications}</span>
               <div className="profile-menu">
                 <button
                   className="profile-logo"

@@ -531,6 +531,43 @@ select {
   position: relative;
 }
 
+.current-time {
+  align-items: center;
+  border-right: 1px solid #e5ebf5;
+  display: flex;
+  gap: 9px;
+  padding-right: 18px;
+}
+
+.current-time > svg,
+.topbar-bell svg {
+  fill: none;
+  height: 20px;
+  stroke: #1769e0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 20px;
+}
+
+.current-time div {
+  display: grid;
+  gap: 2px;
+}
+
+.current-time strong {
+  color: #17223b;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.topbar-bell {
+  align-items: center;
+  display: inline-flex;
+}
+
 .dashboard-body {
   align-content: start;
   display: grid;
@@ -3048,6 +3085,19 @@ select {
 
   .topbar {
     padding: 0 16px;
+  }
+
+  .topbar-profile {
+    gap: 12px;
+  }
+
+  .current-time {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  .current-time > svg {
+    display: none;
   }
 
   .dashboard-body {
