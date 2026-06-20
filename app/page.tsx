@@ -3,6 +3,21 @@
 import { ClipboardEvent, FormEvent, Fragment, KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { API_BASE_URL } from "./api/api";
 
 const menuItems = ["Dashboard", /* "Loans", */ "Chats", "Feedback", "Contact Us"];
@@ -91,6 +106,29 @@ const menuIcons: Record<string, ReactNode> = {
     </svg>
   ),
 };
+const dashboardIcons: Record<string, ReactNode> = {
+  users: menuIcons.Users,
+  revenue: (
+    <svg viewBox="0 0 24 24">
+      <path d="M7 5h10M7 9h10M8 5c5 0 6 7 0 7h-1l8 7M7 12h4" />
+    </svg>
+  ),
+  subscriptions: menuIcons.Subscriptions,
+  reports: (
+    <svg viewBox="0 0 24 24">
+      <path d="M6 3h9l3 3v15H6zM14 3v4h4M9 16v-3M12 16V9M15 16v-5" />
+    </svg>
+  ),
+  messages: menuIcons.Chats,
+  feedback: menuIcons.Feedback,
+  notifications: menuIcons.Notifications,
+  employees: menuIcons.Users,
+  roles: (
+    <svg viewBox="0 0 24 24">
+      <path d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6zM9 12l2 2 4-4" />
+    </svg>
+  ),
+};
 const loanTypeOptions = [
   { label: "Personal Loan", value: "personal" },
   { label: "Overdraft Loan", value: "overdraft" },
@@ -128,9 +166,29 @@ type DashboardCounts = {
   newUsers: number;
   subscriptions: number;
   amount: number;
+  revenue?: {
+    total: number;
+    subscriptions: number;
+    cibilRepair: number;
+  };
   upcomingOverdues: number;
   totalMessages: number;
   totalFeedback?: number;
+  totalCreditReports?: number;
+  reportsWithScore?: number;
+  totalNotifications?: number;
+  unreadNotifications?: number;
+  employees?: {
+    total: number;
+    active: number;
+    inactive: number;
+    suspended: number;
+  };
+  roles?: {
+    total: number;
+    active: number;
+    inactive: number;
+  };
   loans: {
     applied: number;
     approved: number;
@@ -141,6 +199,8 @@ type DashboardCounts = {
     usersByAccessType: Array<{ label: string; count: number; percentage: number }>;
     subscriptionsByStatus: Array<{ label: string; count: number; percentage: number }>;
     loansByStatus: Array<{ label: string; count: number; percentage: number }>;
+    cibilRepairByStatus?: Array<{ label: string; count: number; percentage: number }>;
+    disputesByStatus?: Array<{ label: string; count: number; percentage: number }>;
     feedbackByRating?: Array<{ label: number; count: number; percentage: number }>;
     monthlyRecords: Array<{ label: string; users: number; messages: number; loans: number }>;
   };
@@ -3484,30 +3544,59 @@ export default function Home() {
       isLegalContentLoading ||
       isChatsLoading ||
       isContactLoading;
-    const statCards = [
-      { label: "Total Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, tone: "blue" },
-      { label: "Subscriptions", value: dashboardCounts?.subscriptions ?? 0, meta: `₹${dashboardCounts?.amount ?? 0}`, tone: "green" },
-      { label: "Messages", value: dashboardCounts?.totalMessages ?? 0, meta: "Total chats", tone: "yellow" },
-      { label: "Loan Applied", value: dashboardCounts?.loans.applied ?? 0, meta: `${dashboardCounts?.loans.pending ?? 0} pending`, tone: "red" },
-    ];
     const monthlyRecords = dashboardCounts?.graphs.monthlyRecords ?? [];
-    const maxMonthlyValue = Math.max(1, ...monthlyRecords.flatMap((record) => [record.users, record.messages, record.loans]));
     const accessTypeGraph = dashboardCounts?.graphs.usersByAccessType ?? [];
+    const subscriptionStatusGraph = dashboardCounts?.graphs.subscriptionsByStatus ?? [];
     const feedbackRatingGraph = dashboardCounts?.graphs.feedbackByRating ?? [];
-    const donutStops = accessTypeGraph.reduce(
-      (stops, item, index) => {
-        const colors = ["#5b8def", "#0b8f4e", "#f4ce45", "#4cc9c0"];
-        const start = stops.total;
-        const end = start + item.percentage;
+    const repairStatusGraph = dashboardCounts?.graphs.cibilRepairByStatus ?? [];
+    const disputesStatusGraph = dashboardCounts?.graphs.disputesByStatus ?? [];
+    const totalRevenue = dashboardCounts?.revenue?.total ?? dashboardCounts?.amount ?? 0;
+    const kpiCards = [
+      { label: "Total Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, icon: dashboardIcons.users, trend: "+12%" },
+      { label: "Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}`, meta: "Total collected", icon: dashboardIcons.revenue, trend: "+8%" },
+      { label: "Subscriptions", value: dashboardCounts?.subscriptions ?? 0, meta: `${dashboardCounts?.upcomingOverdues ?? 0} past due`, icon: dashboardIcons.subscriptions, trend: "+5%" },
+      { label: "Credit Reports", value: dashboardCounts?.totalCreditReports ?? 0, meta: `${dashboardCounts?.reportsWithScore ?? 0} with score`, icon: dashboardIcons.reports, trend: "0%" },
+      { label: "Messages", value: dashboardCounts?.totalMessages ?? 0, meta: "Total chats", icon: dashboardIcons.messages, trend: "+3%" },
+      { label: "Feedback", value: dashboardCounts?.totalFeedback ?? 0, meta: "User ratings", icon: dashboardIcons.feedback, trend: "+6%" },
+      { label: "Notifications", value: dashboardCounts?.totalNotifications ?? 0, meta: `${dashboardCounts?.unreadNotifications ?? 0} unread`, icon: dashboardIcons.notifications, trend: "0%" },
+      { label: "Employees", value: dashboardCounts?.employees?.total ?? 0, meta: `${dashboardCounts?.employees?.active ?? 0} active`, icon: dashboardIcons.employees, trend: "0%" },
+      { label: "Roles", value: dashboardCounts?.roles?.total ?? 0, meta: `${dashboardCounts?.roles?.active ?? 0} active`, icon: dashboardIcons.roles, trend: "0%" },
+    ];
+    const pieColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444", "#7c3aed"];
+    const subscriptionColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444"];
+    const revenueBreakdown = dashboardCounts?.revenue
+      ? [{
+        name: "Revenue",
+        subscriptionRevenue: dashboardCounts.revenue.subscriptions,
+        cibilRepairRevenue: dashboardCounts.revenue.cibilRepair,
+      }]
+      : [];
+    const feedbackBars = [1, 2, 3, 4, 5].map((rating) => {
+      const item = feedbackRatingGraph.find((entry) => Number(entry.label) === rating);
 
-        return {
-          total: end,
-          gradient: `${stops.gradient}${stops.gradient ? ", " : ""}${colors[index % colors.length]} ${start}% ${end}%`,
-        };
-      },
-      { total: 0, gradient: "" }
-    );
-    const donutGradient = `${donutStops.gradient}${donutStops.total < 100 ? `${donutStops.gradient ? ", " : ""}#e5e7eb ${donutStops.total}% 100%` : ""}`;
+      return {
+        rating: `${rating} Star`,
+        count: item?.count ?? 0,
+        percentage: item?.percentage ?? 0,
+      };
+    });
+    const hasFeedbackData = feedbackBars.some((item) => item.count > 0);
+    const dashboardTooltip = ({ active, payload, label }: any) => {
+      if (!active || !payload?.length) {
+        return null;
+      }
+
+      return (
+        <div className="analytics-tooltip">
+          {label ? <strong>{label}</strong> : null}
+          {payload.map((item: any) => (
+            <span key={item.name || item.dataKey} style={{ color: item.color }}>
+              {item.name}: {String(item.dataKey).toLowerCase().includes("revenue") ? `₹${Number(item.value || 0).toLocaleString("en-IN")}` : item.value}
+            </span>
+          ))}
+        </div>
+      );
+    };
     const canCreateHomepageThemes = hasActionPermission("Homepage Themes", "create");
     const canUpdateHomepageThemes = hasActionPermission("Homepage Themes", "update");
     const canDeleteHomepageThemes = hasActionPermission("Homepage Themes", "delete");
@@ -5101,137 +5190,205 @@ export default function Home() {
                 />
               </>
             ) : (
-              <>
-                <section className="welcome-panel">
+              <section className="analytics-dashboard">
+                <div className="analytics-hero">
                   <div>
+                    <span>ScoreCare Analytics</span>
                     <h2>Welcome back, {adminUser?.fullName || "Admin"}</h2>
-                    <p>Here is what is happening with ScoreCare today.</p>
+                    <p>Live operational overview across users, revenue, service activity, and access management.</p>
                   </div>
-                  <span>Jun 10, 2026 14:45:59</span>
-                </section>
+                  <strong>₹{totalRevenue.toLocaleString("en-IN")}</strong>
+                </div>
 
-                <section className="stats-grid">
-                  {statCards.map((card) => (
-                    <article className="stat-card" key={card.label}>
-                      <span className={`stat-icon ${card.tone}`}>▣</span>
+                {dashboardError ? <p className="dashboard-error">{dashboardError}</p> : null}
+
+                <section className="analytics-kpi-grid">
+                  {kpiCards.map((card) => (
+                    <article className="analytics-kpi-card" key={card.label}>
+                      <div className="analytics-kpi-icon">{card.icon}</div>
                       <div>
+                        <span>{card.label}</span>
                         <strong>{card.value}</strong>
-                        <p>{card.label}</p>
+                        <small>{card.meta}</small>
                       </div>
-                      <em>{card.meta}</em>
+                      <em>{card.trend}</em>
                     </article>
                   ))}
                 </section>
-                {dashboardError ? <p className="dashboard-error">{dashboardError}</p> : null}
 
-                <section className="dashboard-grid">
-                  <article className="panel revenue-panel">
-                    <div className="panel-header">
-                      <h3>Monthly Records</h3>
-                      <div className="tabs">
-                        <button type="button">Users</button>
-                        <button type="button">Messages</button>
-                        <button type="button">Loans</button>
+                <section className="analytics-chart-grid">
+                  <article className="analytics-chart-card">
+                    <header>
+                      <div>
+                        <h3>Users by Access Type</h3>
+                        <p>Free vs paid distribution</p>
                       </div>
-                    </div>
-                    <div className="chart">
-                      {monthlyRecords.map((record) => (
-                        <div className="chart-month" key={record.label}>
-                          <div>
-                            <span className="revenue-bar" style={{ height: `${(record.users / maxMonthlyValue) * 100}%` }} />
-                            <span className="expense-bar" style={{ height: `${(record.messages / maxMonthlyValue) * 100}%` }} />
-                            <span className="loan-bar" style={{ height: `${(record.loans / maxMonthlyValue) * 100}%` }} />
-                          </div>
-                          <small>{record.label.slice(5)}</small>
-                        </div>
-                      ))}
-                    </div>
+                    </header>
+                    {accessTypeGraph.length ? (
+                      <ResponsiveContainer height={280} width="100%">
+                        <PieChart>
+                          <Pie animationDuration={800} data={accessTypeGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105} paddingAngle={3}>
+                            {accessTypeGraph.map((entry, index) => (
+                              <Cell fill={pieColors[index % pieColors.length]} key={entry.label} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={dashboardTooltip} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="analytics-empty">No Data Available</div>
+                    )}
                   </article>
 
-                  <article className="panel traffic-panel">
-                    <h3>Users By Access Type</h3>
-                    <div className="donut" style={{ background: `conic-gradient(${donutGradient || "#e5e7eb 0 100%"})` }}>
-                      <span>Total<br /><strong>{dashboardCounts?.totalUsers ?? 0}</strong></span>
-                    </div>
-                    <ul>
-                      {accessTypeGraph.map((item, index) => (
-                        <li key={item.label}>
-                          <span className={`dot ${["blue", "green", "yellow", "teal"][index]}`} />
-                          {item.label}
-                          <strong>{item.percentage}%</strong>
-                        </li>
-                      ))}
-                    </ul>
+                  <article className="analytics-chart-card">
+                    <header>
+                      <div>
+                        <h3>Subscription Status</h3>
+                        <p>Active, free and past due</p>
+                      </div>
+                    </header>
+                    {subscriptionStatusGraph.length ? (
+                      <ResponsiveContainer height={280} width="100%">
+                        <PieChart>
+                          <Pie animationDuration={800} data={subscriptionStatusGraph} dataKey="count" innerRadius={72} nameKey="label" outerRadius={108} paddingAngle={4}>
+                            {subscriptionStatusGraph.map((entry, index) => (
+                              <Cell fill={subscriptionColors[index % subscriptionColors.length]} key={entry.label} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={dashboardTooltip} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="analytics-empty">No Data Available</div>
+                    )}
+                  </article>
+
+                  <article className="analytics-chart-card wide">
+                    <header>
+                      <div>
+                        <h3>Revenue Breakdown</h3>
+                        <p>Subscription Revenue vs CIBIL Repair Revenue</p>
+                      </div>
+                    </header>
+                    {revenueBreakdown.length ? (
+                      <ResponsiveContainer height={310} width="100%">
+                        <BarChart data={revenueBreakdown}>
+                          <CartesianGrid stroke="#e8edf5" vertical={false} />
+                          <XAxis dataKey="name" stroke="#64748b" />
+                          <YAxis stroke="#64748b" tickFormatter={(value) => `₹${value}`} />
+                          <Tooltip content={dashboardTooltip} />
+                          <Legend />
+                          <Bar animationDuration={800} dataKey="subscriptionRevenue" fill="#1769e0" name="Subscription Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
+                          <Bar animationDuration={800} dataKey="cibilRepairRevenue" fill="#13a8a8" name="CIBIL Repair Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="analytics-empty">No Data Available</div>
+                    )}
+                  </article>
+
+                  <article className="analytics-chart-card">
+                    <header>
+                      <div>
+                        <h3>Feedback Rating Distribution</h3>
+                        <p>Ratings from 1-5 stars</p>
+                      </div>
+                    </header>
+                    {hasFeedbackData ? (
+                      <ResponsiveContainer height={300} width="100%">
+                        <BarChart data={feedbackBars} layout="vertical">
+                          <CartesianGrid stroke="#e8edf5" horizontal={false} />
+                          <XAxis stroke="#64748b" type="number" />
+                          <YAxis dataKey="rating" stroke="#64748b" type="category" width={70} />
+                          <Tooltip content={dashboardTooltip} />
+                          <Bar animationDuration={800} dataKey="count" name="Ratings" radius={[0, 8, 8, 0]}>
+                            {feedbackBars.map((entry) => (
+                              <Cell fill={entry.rating.startsWith("5") ? "#1769e0" : "#8fb5ef"} key={entry.rating} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="analytics-empty">No Data Available</div>
+                    )}
+                  </article>
+
+                  <article className="analytics-chart-card">
+                    <header>
+                      <div>
+                        <h3>CIBIL Repair Status</h3>
+                        <p>Upload Document, Submitted, Processing, Closed</p>
+                      </div>
+                    </header>
+                    {repairStatusGraph.length ? (
+                      <ResponsiveContainer height={280} width="100%">
+                        <PieChart>
+                          <Pie data={repairStatusGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105}>
+                            {repairStatusGraph.map((entry, index) => (
+                              <Cell fill={pieColors[index % pieColors.length]} key={entry.label} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={dashboardTooltip} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="analytics-empty">No Data Available</div>
+                    )}
+                  </article>
+
+                  <article className="analytics-chart-card">
+                    <header>
+                      <div>
+                        <h3>Disputes Status</h3>
+                        <p>Open, resolved and rejected</p>
+                      </div>
+                    </header>
+                    {disputesStatusGraph.length ? (
+                      <ResponsiveContainer height={280} width="100%">
+                        <PieChart>
+                          <Pie data={disputesStatusGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105}>
+                            {disputesStatusGraph.map((entry, index) => (
+                              <Cell fill={pieColors[index % pieColors.length]} key={entry.label} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={dashboardTooltip} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="analytics-empty">No Data Available</div>
+                    )}
+                  </article>
+
+                  <article className="analytics-chart-card full">
+                    <header>
+                      <div>
+                        <h3>Monthly Activity</h3>
+                        <p>Users, messages and loans by month</p>
+                      </div>
+                    </header>
+                    {monthlyRecords.length ? (
+                      <ResponsiveContainer height={340} width="100%">
+                        <LineChart data={monthlyRecords}>
+                          <CartesianGrid stroke="#e8edf5" vertical={false} />
+                          <XAxis dataKey="label" stroke="#64748b" />
+                          <YAxis stroke="#64748b" />
+                          <Tooltip content={dashboardTooltip} />
+                          <Legend />
+                          <Line animationDuration={900} dataKey="users" dot={false} name="Users" stroke="#1769e0" strokeWidth={3} type="monotone" />
+                          <Line animationDuration={900} dataKey="messages" dot={false} name="Messages" stroke="#13a8a8" strokeWidth={3} type="monotone" />
+                          <Line animationDuration={900} dataKey="loans" dot={false} name="Loans" stroke="#f59e0b" strokeWidth={3} type="monotone" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="analytics-empty">No Data Available</div>
+                    )}
                   </article>
                 </section>
-
-                <section className="dashboard-grid bottom-grid">
-                  <article className="panel orders-panel">
-                    <div className="panel-header">
-                      <h3>Recent Subscriptions</h3>
-                      <button type="button">View All</button>
-                    </div>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Status</th>
-                          <th>Count</th>
-                          <th>Type</th>
-                          <th>Amount</th>
-                          <th>Percentage</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dashboardCounts?.graphs.subscriptionsByStatus.map((item) => (
-                          <tr key={item.label}>
-                            <td>{item.label}</td>
-                            <td>{item.count}</td>
-                            <td>Subscription</td>
-                            <td>₹{dashboardCounts.amount}</td>
-                            <td><span>{item.percentage}%</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </article>
-
-                  <article className="panel activity-panel">
-                    <h3>Loan Status</h3>
-                    <p>Applied loans: {dashboardCounts?.loans.applied ?? 0}</p>
-                    <p>Approved loans: {dashboardCounts?.loans.approved ?? 0}</p>
-                    <p>Rejected loans: {dashboardCounts?.loans.rejected ?? 0}</p>
-                    <p>Pending loans: {dashboardCounts?.loans.pending ?? 0}</p>
-                  </article>
-                </section>
-
-                <section className="dashboard-grid feedback-dashboard-grid">
-                  <article className="panel feedback-analytics-panel">
-                    <div className="panel-header">
-                      <h3>Feedback Analytics</h3>
-                      <span>{dashboardCounts?.totalFeedback ?? 0} total</span>
-                    </div>
-                    <div className="feedback-rating-list">
-                      {feedbackRatingGraph.length ? (
-                        feedbackRatingGraph.map((item) => (
-                          <div className="feedback-rating-row" key={item.label}>
-                            <span>{item.label} ★</span>
-                            <div>
-                              <i style={{ width: `${item.percentage}%` }} />
-                            </div>
-                            <strong>{item.count}</strong>
-                            <em>{item.percentage}%</em>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="empty-state compact">
-                          <img src="/no-records.svg" alt="No records found" />
-                          <strong>No feedback analytics found</strong>
-                        </div>
-                      )}
-                    </div>
-                  </article>
-                </section>
-              </>
+              </section>
             )}
           </div>
         </section>

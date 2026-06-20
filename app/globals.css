@@ -566,6 +566,227 @@ select {
   padding: 0 2px;
 }
 
+.analytics-dashboard {
+  color: #111827;
+  display: grid;
+  gap: 24px;
+}
+
+.analytics-hero {
+  align-items: center;
+  background: linear-gradient(135deg, #ffffff 0%, #eef5ff 100%);
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  display: flex;
+  justify-content: space-between;
+  min-height: 150px;
+  overflow: hidden;
+  padding: 28px;
+  position: relative;
+}
+
+.analytics-hero::after {
+  background: rgba(23, 105, 224, 0.06);
+  border-radius: 50%;
+  content: "";
+  height: 220px;
+  position: absolute;
+  right: -80px;
+  top: -80px;
+  width: 220px;
+}
+
+.analytics-hero span,
+.analytics-chart-card p,
+.analytics-kpi-card span,
+.analytics-kpi-card small {
+  color: #64748b;
+}
+
+.analytics-hero span {
+  color: #1769e0;
+  font-weight: 800;
+}
+
+.analytics-hero h2 {
+  color: #111827;
+  font-size: 30px;
+  margin: 8px 0;
+}
+
+.analytics-hero p {
+  color: #64748b;
+  margin: 0;
+  max-width: 620px;
+}
+
+.analytics-hero strong {
+  color: #1769e0;
+  font-size: 34px;
+  position: relative;
+  z-index: 1;
+}
+
+.analytics-kpi-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.analytics-kpi-card,
+.analytics-chart-card {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.analytics-kpi-card {
+  align-items: center;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  min-height: 118px;
+  padding: 18px;
+}
+
+.analytics-kpi-icon {
+  align-items: center;
+  background: #eef5ff;
+  border: 1px solid #d4e4fb;
+  border-radius: 8px;
+  color: #1769e0;
+  display: flex;
+  font-weight: 950;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.analytics-kpi-icon svg {
+  fill: none;
+  height: 22px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 22px;
+}
+
+.analytics-kpi-card strong {
+  color: #111827;
+  display: block;
+  font-size: 26px;
+  margin: 6px 0;
+}
+
+.analytics-kpi-card em {
+  background: #eef5ff;
+  border: 1px solid #d4e4fb;
+  border-radius: 999px;
+  color: #1769e0;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+  padding: 6px 9px;
+}
+
+.analytics-chart-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-chart-card {
+  border-radius: 8px;
+  min-height: 390px;
+  padding: 20px;
+}
+
+.analytics-chart-card.wide,
+.analytics-chart-card.full {
+  grid-column: 1 / -1;
+}
+
+.analytics-chart-card header {
+  align-items: start;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.analytics-chart-card h3 {
+  color: #111827;
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+
+.analytics-chart-card p {
+  margin: 0;
+}
+
+.analytics-empty {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  display: flex;
+  font-weight: 800;
+  height: 280px;
+  justify-content: center;
+}
+
+.analytics-tooltip {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+  color: #111827;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.analytics-tooltip strong {
+  color: #1769e0;
+}
+
+.analytics-dashboard .recharts-default-legend {
+  color: #64748b;
+}
+
+.analytics-dashboard .recharts-legend-item-text,
+.analytics-dashboard .recharts-text {
+  fill: #64748b;
+  color: #64748b !important;
+}
+
+@media (max-width: 1180px) {
+  .analytics-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .analytics-hero {
+    align-items: start;
+    display: grid;
+    gap: 18px;
+  }
+
+  .analytics-kpi-grid,
+  .analytics-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-chart-card.wide,
+  .analytics-chart-card.full {
+    grid-column: auto;
+  }
+}
+
 .welcome-panel h2 {
   font-size: 24px;
   margin: 0 0 6px;
