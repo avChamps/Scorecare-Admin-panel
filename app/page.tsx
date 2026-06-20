@@ -1013,10 +1013,6 @@ export default function Home() {
   const [apiLogsBureauType, setApiLogsBureauType] = useState("");
   const [apiLogsOperationType, setApiLogsOperationType] = useState("");
   const [apiLogsStatus, setApiLogsStatus] = useState("");
-  const [apiLogsFromDate, setApiLogsFromDate] = useState("");
-  const [apiLogsToDate, setApiLogsToDate] = useState("");
-  const [apiLogsLimit, setApiLogsLimit] = useState("20");
-  const [apiLogsIncludePayload, setApiLogsIncludePayload] = useState(false);
   const [apiLogsError, setApiLogsError] = useState("");
   const [isApiLogsLoading, setIsApiLogsLoading] = useState(false);
   const [cibilUsersData, setCibilUsersData] = useState<UsersResponse | null>(null);
@@ -1184,70 +1180,75 @@ export default function Home() {
   const [isContactLoading, setIsContactLoading] = useState(false);
 
   function loadAdminViewData(view: AppView) {
-    if (view === "General" && !hasLoadedGeneral) {
+    if (view === "Dashboard" && adminUser?.token) {
+      loadDashboardCounts(adminUser.token);
+    }
+
+    if (view === "General") {
       loadGeneralSettings();
     }
 
-    if (view === "FAQs" && !hasLoadedFaqs) {
+    if (view === "FAQs") {
       loadFaqs();
     }
 
-    if (view === "Homepage Themes" && !hasLoadedHomepageThemes) {
+    if (view === "Homepage Themes") {
       loadHomepageThemes();
     }
 
-    if (view === "Legal Center" && !hasLoadedLegalContent) {
+    if (view === "Legal Center") {
       loadLegalContent();
     }
 
-    if (view === "Notifications" && !notificationUsersData) {
+    if (view === "Notifications") {
       loadNotificationUsers();
       loadAdminNotifications();
     }
 
-    if (view === "Plans & Benefits" && !hasLoadedAdminPlans) {
+    if (view === "Plans & Benefits") {
       loadAdminPlans();
+      loadCibilRepairContent();
     }
 
-    if (view === "Feedback" && !feedbackData) {
+    if (view === "Feedback") {
       loadFeedback();
     }
 
-    if (view === "Contact Us" && !contactRequestsData) {
+    if (view === "Contact Us") {
       loadContactRequests();
     }
 
-    if ((view === "Users" || view === "Subscriptions") && !usersData) {
+    if (view === "Users" || view === "Subscriptions") {
       loadUsers();
     }
 
-    if (view === "Report Downloads" && !reportDownloadsData) {
+    if (view === "Report Downloads") {
       loadReportDownloads();
     }
 
-    if (view === "API Logs" && !apiLogsData) {
-      loadApiLogs();
-    }
-
-    if (view === "Download CIBIL" && !cibilUsersData) {
+    if (view === "Download CIBIL") {
       loadCibilUsers();
     }
 
-    if (view === "Employees" && !employeesData) {
+    if (view === "Manual Report") {
+      loadManualReportDownloads();
+    }
+
+    if (view === "Employees") {
       loadEmployees();
       loadEmployeeRoles();
     }
 
-    if (view === "Roles" && !employeeRolesData) {
+    if (view === "Roles") {
       loadEmployeeRoles();
       loadEmployeeMenuAccess();
     }
 
-    if (view === "Loans" && !loansData) {
+    if (view === "Loans") {
       loadLoans();
     }
 
-    if (view === "Chats" && !chatsData) {
+    if (view === "Chats") {
       loadChats();
     }
   }
@@ -1498,10 +1499,6 @@ export default function Home() {
       bureauType: string;
       operationType: string;
       status: string;
-      from: string;
-      to: string;
-      limit: string;
-      includePayload: boolean;
     }> = {}
   ) {
     if (!adminUser?.token) {
@@ -1515,19 +1512,12 @@ export default function Home() {
       const bureauType = filters.bureauType ?? apiLogsBureauType;
       const operationType = filters.operationType ?? apiLogsOperationType;
       const status = filters.status ?? apiLogsStatus;
-      const from = filters.from ?? apiLogsFromDate;
-      const to = filters.to ?? apiLogsToDate;
-      const limit = filters.limit ?? apiLogsLimit;
-      const includePayload = filters.includePayload ?? apiLogsIncludePayload;
-      const params = new URLSearchParams({ page: String(page), limit });
+      const params = new URLSearchParams({ page: String(page), limit: "20" });
 
       if (search) params.set("search", search);
       if (bureauType) params.set("bureauType", bureauType);
       if (operationType) params.set("operationType", operationType);
       if (status) params.set("status", status);
-      if (from) params.set("from", from);
-      if (to) params.set("totime", to);
-      if (includePayload) params.set("includePayload", "true");
 
       const response = await fetch(`${API_BASE_URL}/admin/credit-bureau-api-hits?${params.toString()}`, {
         headers: { Authorization: `Bearer ${adminUser.token}` },
@@ -3486,19 +3476,11 @@ export default function Home() {
     setApiLogsBureauType("");
     setApiLogsOperationType("");
     setApiLogsStatus("");
-    setApiLogsFromDate("");
-    setApiLogsToDate("");
-    setApiLogsLimit("20");
-    setApiLogsIncludePayload(false);
     loadApiLogs(1, {
       search: "",
       bureauType: "",
       operationType: "",
       status: "",
-      from: "",
-      to: "",
-      limit: "20",
-      includePayload: false,
     });
   }
 
@@ -3819,10 +3801,11 @@ export default function Home() {
   }, [activeView, adminUser?.token, reportDownloadsData, isReportDownloadsLoading]);
 
   useEffect(() => {
-    if (activeView === "API Logs" && adminUser?.token && !apiLogsData && !isApiLogsLoading) {
+    if (activeView === "API Logs" && adminUser?.token) {
+      setApiLogsData(null);
       loadApiLogs();
     }
-  }, [activeView, adminUser?.token, apiLogsData, isApiLogsLoading]);
+  }, [activeView, adminUser?.token]);
 
   useEffect(() => {
     if (activeView === "Download CIBIL" && adminUser?.token && !cibilUsersData && !isCibilUsersLoading) {
@@ -4288,7 +4271,6 @@ export default function Home() {
       "Duration",
       "Requested By",
       "Created At",
-      ...(apiLogsIncludePayload ? ["Request Payload", "Response Payload"] : []),
     ];
     const apiLogRows = apiLogsData?.hits.map((hit) => [
       hit.bureauType.toUpperCase(),
@@ -4303,12 +4285,6 @@ export default function Home() {
         ? `${hit.requestedByEmployeeName}${hit.requestedByEmployeeCode ? ` (${hit.requestedByEmployeeCode})` : ""}`
         : hit.requestedByUserName || "-",
       formatDate(hit.createdAt),
-      ...(apiLogsIncludePayload
-        ? [
-          <pre className="api-log-payload">{JSON.stringify(hit.requestPayload ?? null, null, 2)}</pre>,
-          <pre className="api-log-payload">{JSON.stringify(hit.responsePayload ?? null, null, 2)}</pre>,
-        ]
-        : []),
     ]) ?? [];
     const manualReportDownloadColumns = ["Bureau", "Name", "Mobile", "PAN", "Credit Score", "PDF", "Downloaded By", "Downloaded At", "Action"];
     const manualReportDownloadRows = manualReportDownloadsData?.downloads.map((download) => [
@@ -5528,22 +5504,6 @@ export default function Home() {
                     <option value="">All statuses</option>
                     <option value="success">Success</option>
                     <option value="failed">Failed</option>
-                  </select>
-                  <DateFilter label="Start date" value={apiLogsFromDate} onChange={setApiLogsFromDate} />
-                  <DateFilter label="End date" value={apiLogsToDate} onChange={setApiLogsToDate} />
-                  <select aria-label="Rows per page" value={apiLogsLimit} onChange={(event) => setApiLogsLimit(event.target.value)}>
-                    <option value="10">10 rows</option>
-                    <option value="20">20 rows</option>
-                    <option value="50">50 rows</option>
-                    <option value="100">100 rows</option>
-                  </select>
-                  <select
-                    aria-label="Payload visibility"
-                    value={apiLogsIncludePayload ? "true" : "false"}
-                    onChange={(event) => setApiLogsIncludePayload(event.target.value === "true")}
-                  >
-                    <option value="false">Hide payloads</option>
-                    <option value="true">Include payloads</option>
                   </select>
                   <button className="icon-button" title="Reset filters" type="button" onClick={resetApiLogFilters}>↻</button>
                   <button disabled={isApiLogsLoading} type="button" onClick={() => loadApiLogs(1)}>Search</button>
