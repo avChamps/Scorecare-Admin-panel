@@ -897,6 +897,10 @@ select {
   position: relative;
 }
 
+.admin-plan-form .date-filter {
+  width: 100%;
+}
+
 .table-toolbar .date-filter-trigger {
   align-items: center;
   background: linear-gradient(180deg, #ffffff 0%, #f7f9ff 100%);
@@ -913,7 +917,28 @@ select {
   width: 100%;
 }
 
+.admin-plan-form .date-filter-trigger {
+  align-items: center;
+  background: #f8f9ff;
+  border: 1px solid #e4e8f5;
+  border-radius: 10px;
+  color: #1f2937;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-weight: 700;
+  gap: 10px;
+  height: 44px;
+  justify-content: space-between;
+  padding: 0 14px;
+  width: 100%;
+}
+
 .table-toolbar .date-filter-trigger.selected {
+  color: #111827;
+}
+
+.admin-plan-form .date-filter-trigger.selected {
   color: #111827;
 }
 
@@ -922,6 +947,14 @@ select {
   background: #ffffff;
   border-color: #8aa7e8;
   box-shadow: 0 0 0 4px rgba(23, 105, 224, 0.1);
+  transform: none;
+}
+
+.admin-plan-form .date-filter-trigger:hover,
+.admin-plan-form .date-filter-trigger:focus {
+  border-color: #6975df;
+  box-shadow: 0 0 0 4px rgba(105, 117, 223, 0.12);
+  outline: none;
   transform: none;
 }
 
@@ -989,7 +1022,30 @@ select {
   transition: background 0.18s ease, color 0.18s ease;
 }
 
+.admin-plan-form .date-picker-popover button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: none;
+  color: #273449;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 800;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
 .table-toolbar .date-picker-popover button:hover {
+  background: #eef5ff;
+  color: #1769e0;
+  transform: none;
+}
+
+.admin-plan-form .date-picker-popover button:hover {
   background: #eef5ff;
   color: #1769e0;
   transform: none;
@@ -1027,7 +1083,18 @@ select {
   color: #1769e0;
 }
 
+.admin-plan-form .date-picker-days button.today {
+  background: #eef5ff;
+  color: #1769e0;
+}
+
 .table-toolbar .date-picker-days button.selected {
+  background: linear-gradient(135deg, #1769e0, #5b8def);
+  box-shadow: 0 8px 18px rgba(23, 105, 224, 0.28);
+  color: #ffffff;
+}
+
+.admin-plan-form .date-picker-days button.selected {
   background: linear-gradient(135deg, #1769e0, #5b8def);
   box-shadow: 0 8px 18px rgba(23, 105, 224, 0.28);
   color: #ffffff;
@@ -1042,6 +1109,11 @@ select {
 }
 
 .table-toolbar .date-picker-footer button {
+  color: #1769e0;
+  padding: 0 10px;
+}
+
+.admin-plan-form .date-picker-footer button {
   color: #1769e0;
   padding: 0 10px;
 }
@@ -1381,6 +1453,22 @@ select {
   overflow: auto;
 }
 
+.employee-modal {
+  overflow-x: hidden;
+}
+
+.employee-joined-date .date-picker-popover {
+  bottom: calc(100% + 10px);
+  top: auto;
+  width: 100%;
+}
+
+.employee-joined-date .date-picker-popover::before {
+  bottom: -7px;
+  top: auto;
+  transform: rotate(225deg);
+}
+
 .notification-modal {
   overflow-x: hidden;
 }
@@ -1394,6 +1482,126 @@ select {
 .modal-plan-form {
   box-shadow: none;
   padding: 0;
+}
+
+.employee-role-page-form {
+  gap: 18px;
+}
+
+.employee-role-details-grid {
+  grid-template-columns: repeat(2, minmax(180px, 320px));
+  justify-content: start;
+}
+
+.role-back-button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d7e2f0;
+  border-radius: 8px;
+  color: #1769e0;
+  cursor: pointer;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.role-back-button .button-icon {
+  height: 18px;
+  margin-right: 0;
+  width: 18px;
+}
+
+.employee-role-access-list {
+  border: 1px solid #e1e8f2;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.employee-role-access-title {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.employee-role-access-title strong {
+  color: #17223b;
+  font-size: 15px;
+}
+
+.employee-role-access-title label {
+  align-items: center;
+  color: #334155;
+  display: flex;
+  font-size: 14px;
+  font-weight: 800;
+  gap: 10px;
+}
+
+.employee-role-access-title .employee-role-select-all {
+  background: #f8faff;
+  border: 1px solid #d7e2f0;
+  border-radius: 8px;
+  color: #1769e0;
+  cursor: pointer;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.employee-role-select-all input {
+  height: 16px;
+  width: 16px;
+}
+
+.employee-role-access-item {
+  border: 1px solid #e6edf6;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.employee-role-access-header {
+  align-items: center;
+  background: #f8faff;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.employee-role-access-header label,
+.employee-role-actions label {
+  align-items: center;
+  color: #334155;
+  display: flex;
+  font-size: 14px;
+  font-weight: 800;
+  gap: 10px;
+}
+
+.employee-role-access-header input,
+.employee-role-actions input {
+  height: 18px;
+  width: 18px;
+}
+
+.employee-role-access-header button {
+  background: #ffffff;
+  border: 1px solid #d7e2f0;
+  border-radius: 8px;
+  color: #1769e0;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 900;
+  height: 32px;
+  width: 32px;
+}
+
+.employee-role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  padding: 14px;
 }
 
 .section-tabs {

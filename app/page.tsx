@@ -155,7 +155,13 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us";
+
+type UserMenuAccess = {
+  menuName: string;
+  childMenuName: string | null;
+  permissions: string[];
+};
 
 const viewRoutes: Record<AppView, string> = {
   Dashboard: "/dashboard",
@@ -166,6 +172,7 @@ const viewRoutes: Record<AppView, string> = {
   "Plans & Benefits": "/plans-benefits",
   Users: "/users",
   Employees: "/employees",
+  Roles: "/roles",
   Subscriptions: "/subscriptions",
   Loans: "/loans",
   Chats: "/chat",
@@ -187,12 +194,31 @@ const routeViews: Record<string, AppView> = {
   "/contact-us": "Contact Us",
   "/users": "Users",
   "/employees": "Employees",
+  "/roles": "Roles",
   "/subscriptions": "Subscriptions",
   "/loans": "Loans",
   "/chat": "Chats",
 };
 
-type ActionIconType = "add" | "edit" | "delete";
+const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string | null }> = {
+  Dashboard: { menuName: "Dashboard", childMenuName: null },
+  General: { menuName: "General", childMenuName: "Site Settings" },
+  "Homepage Themes": { menuName: "General", childMenuName: "Homepage Themes" },
+  "Legal Center": { menuName: "General", childMenuName: "Legal Center" },
+  Notifications: { menuName: "General", childMenuName: "Notifications" },
+  "Plans & Benefits": { menuName: "Plans & Benefits", childMenuName: "Repair service" },
+  Users: { menuName: "User management", childMenuName: "Users" },
+  Employees: { menuName: "Employee management", childMenuName: "Employees" },
+  Roles: { menuName: "Employee management", childMenuName: "Roles" },
+  Subscriptions: { menuName: "Subscriptions", childMenuName: "Subscriptions" },
+  Loans: { menuName: "Loans", childMenuName: null },
+  Chats: { menuName: "Chats", childMenuName: null },
+  FAQs: { menuName: "General", childMenuName: "FAQ" },
+  Feedback: { menuName: "Feedback", childMenuName: null },
+  "Contact Us": { menuName: "Contact Us", childMenuName: null },
+};
+
+type ActionIconType = "add" | "edit" | "delete" | "back";
 
 type HtmlEditorCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList";
 
@@ -269,6 +295,14 @@ function HtmlEditor({ label, value, onChange }: HtmlEditorProps) {
 }
 
 function ActionIcon({ type }: { type: ActionIconType }) {
+  if (type === "back") {
+    return (
+      <svg className="button-icon" viewBox="0 0 24 24">
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+    );
+  }
+
   if (type === "add") {
     return (
       <svg className="button-icon" viewBox="0 0 24 24">
@@ -293,7 +327,7 @@ function ActionIcon({ type }: { type: ActionIconType }) {
   );
 }
 
-function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function DateFilter({ label, value, onChange, className = "" }: { label: string; value: string; onChange: (value: string) => void; className?: string }) {
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const selectedDate = value ? new Date(`${value}T00:00:00`) : null;
@@ -340,7 +374,7 @@ function DateFilter({ label, value, onChange }: { label: string; value: string; 
   }
 
   return (
-    <div className="date-filter" ref={pickerRef}>
+    <div className={`date-filter ${className}`} ref={pickerRef}>
       <button className={`date-filter-trigger ${value ? "selected" : ""}`} type="button" onClick={() => setIsOpen((current) => !current)}>
         <span>{formatDisplayDate(value)}</span>
         <svg viewBox="0 0 24 24">
@@ -501,6 +535,7 @@ type EmployeeRow = {
   mobileNumber: string;
   email: string;
   role: string;
+  rolePublicId?: string | null;
   department: string;
   designation: string;
   status: string;
@@ -519,15 +554,48 @@ type EmployeesResponse = {
 };
 
 type EmployeeForm = {
-  employeeCode: string;
   fullName: string;
   mobileNumber: string;
   email: string;
   role: string;
+  rolePublicId: string;
   department: string;
   designation: string;
   status: string;
   joinedAt: string;
+};
+
+type EmployeeMenuAccess = {
+  menuName: string;
+  childMenuName: string | null;
+  permissions: string[];
+};
+
+type EmployeeRole = {
+  publicId: string;
+  roleName: string;
+  description?: string | null;
+  status: string;
+  menuAccess?: EmployeeMenuAccess[];
+  createdAt?: string;
+};
+
+type EmployeeRolesResponse = {
+  roles?: EmployeeRole[];
+  employeeRoles?: EmployeeRole[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+type EmployeeRoleForm = {
+  roleName: string;
+  description: string;
+  status: string;
+  menuAccess: EmployeeMenuAccess[];
 };
 
 type LoanRow = {
@@ -726,6 +794,7 @@ export default function Home() {
   const [resendSeconds, setResendSeconds] = useState(45);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+  const [userMenuAccess, setUserMenuAccess] = useState<UserMenuAccess[]>([]);
   const [dashboardCounts, setDashboardCounts] = useState<DashboardCounts | null>(null);
   const [error, setError] = useState("");
   const [dashboardError, setDashboardError] = useState("");
@@ -756,12 +825,27 @@ export default function Home() {
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [deletingEmployee, setDeletingEmployee] = useState<EmployeeRow | null>(null);
+  const [employeeRolesData, setEmployeeRolesData] = useState<EmployeeRolesResponse | null>(null);
+  const [employeeMenuAccess, setEmployeeMenuAccess] = useState<EmployeeMenuAccess[]>([]);
+  const [employeeRolesSearch, setEmployeeRolesSearch] = useState("");
+  const [employeeRolesError, setEmployeeRolesError] = useState("");
+  const [isEmployeeRolesLoading, setIsEmployeeRolesLoading] = useState(false);
+  const [isEmployeeRoleModalOpen, setIsEmployeeRoleModalOpen] = useState(false);
+  const [editingEmployeeRoleId, setEditingEmployeeRoleId] = useState<string | null>(null);
+  const [expandedEmployeeRoleAccess, setExpandedEmployeeRoleAccess] = useState<string[]>([]);
+  const [deletingEmployeeRole, setDeletingEmployeeRole] = useState<EmployeeRole | null>(null);
+  const [employeeRoleForm, setEmployeeRoleForm] = useState<EmployeeRoleForm>({
+    roleName: "",
+    description: "",
+    status: "active",
+    menuAccess: [],
+  });
   const [employeeForm, setEmployeeForm] = useState<EmployeeForm>({
-    employeeCode: "",
     fullName: "",
     mobileNumber: "",
     email: "",
     role: "",
+    rolePublicId: "",
     department: "",
     designation: "",
     status: "active",
@@ -907,6 +991,12 @@ export default function Home() {
 
     if (view === "Employees" && !employeesData) {
       loadEmployees();
+      loadEmployeeRoles();
+    }
+
+    if (view === "Roles" && !employeeRolesData) {
+      loadEmployeeRoles();
+      loadEmployeeMenuAccess();
     }
 
     if (view === "Loans" && !loansData) {
@@ -919,6 +1009,10 @@ export default function Home() {
   }
 
   function openAdminView(view: AppView) {
+    if (!hasViewPermission(view)) {
+      return;
+    }
+
     setActiveView(view);
     window.history.pushState(null, "", viewRoutes[view]);
     loadAdminViewData(view);
@@ -951,6 +1045,48 @@ export default function Home() {
   const [chatsError, setChatsError] = useState("");
   const [isChatsLoading, setIsChatsLoading] = useState(false);
 
+  function getAccessForView(view: AppView, accessList = userMenuAccess) {
+    const accessTarget = viewAccessMap[view];
+
+    if (view === "Plans & Benefits") {
+      return accessList.find((access) => access.menuName.toLowerCase() === accessTarget.menuName.toLowerCase());
+    }
+
+    return accessList.find(
+      (access) =>
+        access.menuName.toLowerCase() === accessTarget.menuName.toLowerCase() &&
+        (access.childMenuName || null)?.toLowerCase() === (accessTarget.childMenuName || null)?.toLowerCase()
+    );
+  }
+
+  function hasViewPermission(view: AppView, accessList = userMenuAccess) {
+    if (view === "Plans & Benefits") {
+      return accessList.some(
+        (access) =>
+          access.menuName.toLowerCase() === viewAccessMap[view].menuName.toLowerCase() &&
+          access.permissions.some((permission) => permission.toLowerCase() === "view")
+      );
+    }
+
+    return Boolean(getAccessForView(view, accessList)?.permissions.some((permission) => permission.toLowerCase() === "view"));
+  }
+
+  function hasActionPermission(view: AppView, permission: string, accessList = userMenuAccess) {
+    if (view === "Plans & Benefits") {
+      return accessList.some(
+        (access) =>
+          access.menuName.toLowerCase() === viewAccessMap[view].menuName.toLowerCase() &&
+          access.permissions.some((item) => item.toLowerCase() === permission.toLowerCase())
+      );
+    }
+
+    return Boolean(getAccessForView(view, accessList)?.permissions.some((item) => item.toLowerCase() === permission.toLowerCase()));
+  }
+
+  function getFirstAllowedView(accessList = userMenuAccess) {
+    return (Object.keys(viewRoutes) as AppView[]).find((view) => hasViewPermission(view, accessList)) || null;
+  }
+
   async function loadDashboardCounts(token: string) {
     try {
       setDashboardError("");
@@ -975,6 +1111,34 @@ export default function Home() {
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : "Unable to load dashboard");
       return false;
+    }
+  }
+
+  async function loadUserPermissions(token: string) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/user-permission`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        localStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        setUserMenuAccess([]);
+        return null;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        return null;
+      }
+
+      const menuAccess = result.data?.menuAccess || result.data?.role?.menuAccess || [];
+      setUserMenuAccess(menuAccess);
+      return menuAccess as UserMenuAccess[];
+    } catch {
+      return null;
     }
   }
 
@@ -1059,6 +1223,61 @@ export default function Home() {
       setEmployeesError(error instanceof Error ? error.message : "Unable to load employees");
     } finally {
       setIsEmployeesLoading(false);
+    }
+  }
+
+  function getEmployeeRoles(result: { data?: EmployeeRolesResponse | EmployeeRole[] }) {
+    if (Array.isArray(result.data)) {
+      return result.data;
+    }
+
+    return result.data?.roles || result.data?.employeeRoles || [];
+  }
+
+  async function loadEmployeeRoles(page = 1, search = employeeRolesSearch) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setEmployeeRolesError("");
+      setIsEmployeeRolesLoading(true);
+      const params = new URLSearchParams({ page: String(page), limit: "20", search });
+      const response = await fetch(`${API_BASE_URL}/admin/employee-roles?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load roles");
+      }
+
+      setEmployeeRolesData(Array.isArray(result.data) ? { roles: result.data } : result.data);
+    } catch (error) {
+      setEmployeeRolesError(error instanceof Error ? error.message : "Unable to load roles");
+    } finally {
+      setIsEmployeeRolesLoading(false);
+    }
+  }
+
+  async function loadEmployeeMenuAccess() {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/employee-menu-access`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load menu access");
+      }
+
+      setEmployeeMenuAccess(Array.isArray(result.data) ? result.data : result.data?.menuAccess || []);
+    } catch (error) {
+      setEmployeeRolesError(error instanceof Error ? error.message : "Unable to load menu access");
     }
   }
 
@@ -1153,11 +1372,11 @@ export default function Home() {
 
   function resetEmployeeForm() {
     setEmployeeForm({
-      employeeCode: "",
       fullName: "",
       mobileNumber: "",
       email: "",
       role: "",
+      rolePublicId: "",
       department: "",
       designation: "",
       status: "active",
@@ -1167,14 +1386,18 @@ export default function Home() {
   }
 
   function openEmployeeModal(employee?: EmployeeRow) {
+    if (!employeeRolesData) {
+      loadEmployeeRoles();
+    }
+
     if (employee) {
       setEditingEmployeeId(employee.publicId);
       setEmployeeForm({
-        employeeCode: employee.employeeCode || "",
         fullName: employee.fullName || "",
         mobileNumber: employee.mobileNumber || "",
         email: employee.email || "",
         role: employee.role || "",
+        rolePublicId: employee.rolePublicId || "",
         department: employee.department || "",
         designation: employee.designation || "",
         status: employee.status || "active",
@@ -1205,7 +1428,17 @@ export default function Home() {
             Authorization: `Bearer ${adminUser.token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(employeeForm),
+          body: JSON.stringify({
+            fullName: employeeForm.fullName,
+            mobileNumber: employeeForm.mobileNumber,
+            email: employeeForm.email,
+            role: employeeForm.role,
+            rolePublicId: employeeForm.rolePublicId,
+            department: employeeForm.department,
+            designation: employeeForm.designation,
+            status: employeeForm.status,
+            joinedAt: employeeForm.joinedAt,
+          }),
         }
       );
       const result = await response.json();
@@ -1229,6 +1462,197 @@ export default function Home() {
       setEmployeesError(error instanceof Error ? error.message : "Unable to save employee");
     } finally {
       setIsEmployeeSaving(false);
+    }
+  }
+
+  async function openEmployeeRoleModal(role?: EmployeeRole) {
+    if (!employeeMenuAccess.length) {
+      loadEmployeeMenuAccess();
+    }
+
+    let roleDetails = role;
+
+    if (role?.publicId && adminUser?.token) {
+      try {
+        setEmployeeRolesError("");
+        setIsEmployeeRolesLoading(true);
+        const response = await fetch(`${API_BASE_URL}/admin/employee-roles/${role.publicId}`, {
+          headers: { Authorization: `Bearer ${adminUser.token}` },
+        });
+        const result = await response.json();
+
+        if (!response.ok || result.status !== "success") {
+          throw new Error(result.message || "Unable to load role");
+        }
+
+        roleDetails = result.data?.role || result.data;
+      } catch (error) {
+        setEmployeeRolesError(error instanceof Error ? error.message : "Unable to load role");
+        return;
+      } finally {
+        setIsEmployeeRolesLoading(false);
+      }
+    }
+
+    setEditingEmployeeRoleId(roleDetails?.publicId || null);
+    setEmployeeRoleForm({
+      roleName: roleDetails?.roleName || "",
+      description: roleDetails?.description || "",
+      status: roleDetails?.status || "active",
+      menuAccess: roleDetails?.menuAccess?.map((access) => ({
+        ...access,
+        permissions: Array.from(new Set([getViewPermission(access), ...access.permissions])),
+      })) || [],
+    });
+    setExpandedEmployeeRoleAccess([]);
+    setIsEmployeeRoleModalOpen(true);
+  }
+
+  function closeEmployeeRoleForm() {
+    setIsEmployeeRoleModalOpen(false);
+    setEditingEmployeeRoleId(null);
+    setExpandedEmployeeRoleAccess([]);
+  }
+
+  function getEmployeeRoleAccessKey(access: EmployeeMenuAccess) {
+    return `${access.menuName}-${access.childMenuName || ""}`;
+  }
+
+  function getViewPermission(access: EmployeeMenuAccess) {
+    return access.permissions.find((permission) => permission.toLowerCase() === "view") || "View";
+  }
+
+  function getSelectedEmployeeRoleAccess(access: EmployeeMenuAccess) {
+    return employeeRoleForm.menuAccess.find(
+      (item) => item.menuName === access.menuName && item.childMenuName === access.childMenuName
+    );
+  }
+
+  function isEmployeeRoleAccessSelected(access: EmployeeMenuAccess) {
+    return Boolean(getSelectedEmployeeRoleAccess(access));
+  }
+
+  function isAllEmployeeRoleAccessSelected() {
+    return employeeMenuAccess.length > 0 && employeeRoleForm.menuAccess.length === employeeMenuAccess.length;
+  }
+
+  function toggleAllEmployeeRoleAccess() {
+    setEmployeeRoleForm((role) => ({
+      ...role,
+      menuAccess: isAllEmployeeRoleAccessSelected()
+        ? []
+        : employeeMenuAccess.map((access) => ({
+          ...access,
+          permissions: Array.from(new Set([getViewPermission(access), ...access.permissions])),
+        })),
+    }));
+  }
+
+  function toggleEmployeeRoleAccess(access: EmployeeMenuAccess) {
+    const viewPermission = getViewPermission(access);
+
+    setEmployeeRoleForm((role) => ({
+      ...role,
+      menuAccess: isEmployeeRoleAccessSelected(access)
+        ? role.menuAccess.filter((item) => item.menuName !== access.menuName || item.childMenuName !== access.childMenuName)
+        : [...role.menuAccess, { ...access, permissions: [viewPermission] }],
+    }));
+  }
+
+  function toggleEmployeeRolePermission(access: EmployeeMenuAccess, permission: string) {
+    const viewPermission = getViewPermission(access);
+
+    setEmployeeRoleForm((role) => {
+      const selectedAccess = role.menuAccess.find(
+        (item) => item.menuName === access.menuName && item.childMenuName === access.childMenuName
+      );
+      const selectedPermissions = selectedAccess?.permissions || [viewPermission];
+      const nextPermissions = permission === viewPermission
+        ? selectedPermissions
+        : selectedPermissions.includes(permission)
+          ? selectedPermissions.filter((item) => item !== permission)
+          : [...selectedPermissions, permission];
+
+      return {
+        ...role,
+        menuAccess: [
+          ...role.menuAccess.filter((item) => item.menuName !== access.menuName || item.childMenuName !== access.childMenuName),
+          { ...access, permissions: Array.from(new Set([viewPermission, ...nextPermissions])) },
+        ],
+      };
+    });
+  }
+
+  function toggleEmployeeRoleAccessExpansion(access: EmployeeMenuAccess) {
+    const accessKey = getEmployeeRoleAccessKey(access);
+
+    setExpandedEmployeeRoleAccess((items) =>
+      items.includes(accessKey) ? items.filter((item) => item !== accessKey) : [...items, accessKey]
+    );
+  }
+
+  async function saveEmployeeRole(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setEmployeeRolesError("");
+      setIsEmployeeRolesLoading(true);
+      const response = await fetch(
+        editingEmployeeRoleId ? `${API_BASE_URL}/admin/employee-roles/${editingEmployeeRoleId}` : `${API_BASE_URL}/admin/employee-roles`,
+        {
+          method: editingEmployeeRoleId ? "PATCH" : "POST",
+          headers: {
+            Authorization: `Bearer ${adminUser.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(employeeRoleForm),
+        }
+      );
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to save role");
+      }
+
+      showToast("success", editingEmployeeRoleId ? "Role updated successfully" : "Role added successfully");
+      closeEmployeeRoleForm();
+      await loadEmployeeRoles(employeeRolesData?.pagination?.page || 1);
+    } catch (error) {
+      setEmployeeRolesError(error instanceof Error ? error.message : "Unable to save role");
+    } finally {
+      setIsEmployeeRolesLoading(false);
+    }
+  }
+
+  async function deleteEmployeeRole() {
+    if (!adminUser?.token || !deletingEmployeeRole?.publicId) {
+      return;
+    }
+
+    try {
+      setEmployeeRolesError("");
+      setIsEmployeeRolesLoading(true);
+      const response = await fetch(`${API_BASE_URL}/admin/employee-roles/${deletingEmployeeRole.publicId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to delete role");
+      }
+
+      showToast("success", "Role deleted successfully");
+      setDeletingEmployeeRole(null);
+      await loadEmployeeRoles(employeeRolesData?.pagination?.page || 1);
+    } catch (error) {
+      setEmployeeRolesError(error instanceof Error ? error.message : "Unable to delete role");
+    } finally {
+      setIsEmployeeRolesLoading(false);
     }
   }
 
@@ -2691,7 +3115,7 @@ export default function Home() {
 
       setIsGeneralMenuOpen(["General", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].includes(routeView));
       setIsUserManagementMenuOpen(routeView === "Users");
-      setIsEmployeeManagementMenuOpen(routeView === "Employees");
+      setIsEmployeeManagementMenuOpen(routeView === "Employees" || routeView === "Roles");
       setIsSubscriptionsMenuOpen(routeView === "Subscriptions");
       setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits");
 
@@ -2764,8 +3188,16 @@ export default function Home() {
   useEffect(() => {
     if (activeView === "Employees" && adminUser?.token && !employeesData && !isEmployeesLoading) {
       loadEmployees();
+      loadEmployeeRoles();
     }
   }, [activeView, adminUser?.token, employeesData, isEmployeesLoading]);
+
+  useEffect(() => {
+    if (activeView === "Roles" && adminUser?.token && !employeeRolesData && !isEmployeeRolesLoading) {
+      loadEmployeeRoles();
+      loadEmployeeMenuAccess();
+    }
+  }, [activeView, adminUser?.token, employeeRolesData, isEmployeeRolesLoading]);
 
   useEffect(() => {
     if (activeView === "Feedback" && adminUser?.token && !feedbackData && !isFeedbackLoading) {
@@ -2801,7 +3233,7 @@ export default function Home() {
   }, [step, mobile]);
 
   useEffect(() => {
-    const savedAdmin = sessionStorage.getItem("scorecare_admin");
+    const savedAdmin = sessionStorage.getItem("scorecare_admin") || localStorage.getItem("scorecare_admin");
 
     if (!savedAdmin) {
       if (!["/login", "/otp"].includes(pathname)) {
@@ -2820,15 +3252,27 @@ export default function Home() {
 
         if (!admin.token) {
           sessionStorage.removeItem("scorecare_admin");
+          localStorage.removeItem("scorecare_admin");
           setIsSessionChecking(false);
           return;
         }
 
+        sessionStorage.setItem("scorecare_admin", savedAdminSession);
+        localStorage.setItem("scorecare_admin", savedAdminSession);
         setAdminUser(admin);
-        const isValidSession = await loadDashboardCounts(admin.token);
+        const permissions = await loadUserPermissions(admin.token);
+        const isValidSession = permissions ? await loadDashboardCounts(admin.token) : false;
 
-        if (isValidSession) {
-          const routeView = routeViews[pathname] || "Dashboard";
+        if (isValidSession && permissions) {
+          const currentRouteView = routeViews[pathname] || "Dashboard";
+          const routeView = hasViewPermission(currentRouteView, permissions) ? currentRouteView : getFirstAllowedView(permissions);
+
+          if (!routeView) {
+            setStep("mobile");
+            router.replace("/login");
+            return;
+          }
+
           setActiveView(routeView);
           setStep("admin");
           router.replace(viewRoutes[routeView]);
@@ -2836,6 +3280,7 @@ export default function Home() {
         }
       } catch {
         sessionStorage.removeItem("scorecare_admin");
+        localStorage.removeItem("scorecare_admin");
         router.replace("/login");
       } finally {
         setIsSessionChecking(false);
@@ -2951,7 +3396,7 @@ export default function Home() {
 
     try {
       const otpMobile = mobile || sessionStorage.getItem("scorecare_otp_mobile") || "";
-      const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+      const response = await fetch(`${API_BASE_URL}/auth/admin/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobileNumber: otpMobile, otp }),
@@ -2962,12 +3407,12 @@ export default function Home() {
         throw new Error(result.message || "Invalid OTP");
       }
 
-      if (!result.data?.user?.isAdmin) {
+      if (!result.data?.employee) {
         setError("You do not have admin access");
         return;
       }
 
-      const user = result.data.user;
+      const user = result.data.employee;
       const sessionUser = {
         token: result.data.token,
         tokenType: result.data.tokenType,
@@ -2977,13 +3422,23 @@ export default function Home() {
       };
 
       sessionStorage.setItem("scorecare_admin", JSON.stringify(sessionUser));
+      localStorage.setItem("scorecare_admin", JSON.stringify(sessionUser));
       sessionStorage.removeItem("scorecare_otp_mobile");
       setAdminUser(sessionUser);
-      const isDashboardReady = await loadDashboardCounts(result.data.token);
+      const permissions = await loadUserPermissions(result.data.token);
+      const isDashboardReady = permissions ? await loadDashboardCounts(result.data.token) : false;
 
-      if (isDashboardReady) {
+      if (isDashboardReady && permissions) {
+        const routeView = getFirstAllowedView(permissions);
+
+        if (!routeView) {
+          setError("You do not have admin access");
+          return;
+        }
+
+        setActiveView(routeView);
         setStep("admin");
-        router.push("/dashboard");
+        router.push(viewRoutes[routeView]);
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : "Invalid OTP");
@@ -3003,7 +3458,9 @@ export default function Home() {
 
   function logoutAdmin() {
     sessionStorage.removeItem("scorecare_admin");
+    localStorage.removeItem("scorecare_admin");
     setAdminUser(null);
+    setUserMenuAccess([]);
     setIsProfileOpen(false);
     setStep("mobile");
     router.push("/login");
@@ -3014,6 +3471,7 @@ export default function Home() {
       isUsersLoading ||
       isEmployeesLoading ||
       isEmployeeSaving ||
+      isEmployeeRolesLoading ||
       isPlansLoading ||
       isLoansLoading ||
       isGeneralLoading ||
@@ -3050,6 +3508,28 @@ export default function Home() {
       { total: 0, gradient: "" }
     );
     const donutGradient = `${donutStops.gradient}${donutStops.total < 100 ? `${donutStops.gradient ? ", " : ""}#e5e7eb ${donutStops.total}% 100%` : ""}`;
+    const canCreateHomepageThemes = hasActionPermission("Homepage Themes", "create");
+    const canUpdateHomepageThemes = hasActionPermission("Homepage Themes", "update");
+    const canDeleteHomepageThemes = hasActionPermission("Homepage Themes", "delete");
+    const canUpdateGeneral = hasActionPermission("General", "update");
+    const canUpdateLegal = hasActionPermission("Legal Center", "update");
+    const canCreateNotifications = hasActionPermission("Notifications", "create");
+    const canCreateFaqs = hasActionPermission("FAQs", "create");
+    const canUpdateFaqs = hasActionPermission("FAQs", "update");
+    const canDeleteFaqs = hasActionPermission("FAQs", "delete");
+    const canCreatePlans = hasActionPermission("Plans & Benefits", "create");
+    const canUpdatePlans = hasActionPermission("Plans & Benefits", "update");
+    const canDeletePlans = hasActionPermission("Plans & Benefits", "delete");
+    const canExportUsers = hasActionPermission("Users", "export");
+    const canCreateEmployees = hasActionPermission("Employees", "create");
+    const canUpdateEmployees = hasActionPermission("Employees", "update");
+    const canDeleteEmployees = hasActionPermission("Employees", "delete");
+    const canCreateRoles = hasActionPermission("Roles", "create");
+    const canUpdateRoles = hasActionPermission("Roles", "update");
+    const canDeleteRoles = hasActionPermission("Roles", "delete");
+    const canUpdateSubscriptions = hasActionPermission("Subscriptions", "update");
+    const canExportLoans = hasActionPermission("Loans", "export");
+    const canUpdateLoans = hasActionPermission("Loans", "update");
     const usersColumns = ["Name", "Mobile", "Email", "Access", "Subscription", "Started At", "Due At", "Credit Score", "Messages", "Loans", "Status"];
     const usersRows = usersData?.users.map((user) => [
       user.fullName,
@@ -3064,7 +3544,18 @@ export default function Home() {
       user.loans.latestStatus || user.loans.total,
       user.status,
     ]) ?? [];
-    const employeeColumns = ["Code", "Name", "Mobile", "Email", "Role", "Department", "Designation", "Status", "Joined At", "Action"];
+    const employeeColumns = [
+      "Code",
+      "Name",
+      "Mobile",
+      "Email",
+      "Role",
+      "Department",
+      "Designation",
+      "Status",
+      "Joined At",
+      ...(canUpdateEmployees || canDeleteEmployees ? ["Action"] : []),
+    ];
     const employeeRows = employeesData?.employees.map((employee) => [
       employee.employeeCode,
       employee.fullName,
@@ -3075,18 +3566,52 @@ export default function Home() {
       employee.designation,
       employee.status,
       formatDate(employee.joinedAt),
-      <div className="table-actions">
-        <button className="table-action" type="button" onClick={() => openEmployeeModal(employee)}>
-          <ActionIcon type="edit" />
-          Edit
-        </button>
-        <button className="table-action danger-action" type="button" onClick={() => setDeletingEmployee(employee)}>
-          <ActionIcon type="delete" />
-          Delete
-        </button>
-      </div>,
+      ...(canUpdateEmployees || canDeleteEmployees
+        ? [
+          <div className="homepage-theme-row-actions">
+            {canUpdateEmployees ? (
+              <button type="button" onClick={() => openEmployeeModal(employee)}>
+                <ActionIcon type="edit" />
+                Edit
+              </button>
+            ) : null}
+            {canDeleteEmployees ? (
+              <button type="button" onClick={() => setDeletingEmployee(employee)}>
+                <ActionIcon type="delete" />
+                Delete
+              </button>
+            ) : null}
+          </div>,
+        ]
+        : []),
     ]) ?? [];
-    const subscriptionColumns = ["Name", "Mobile", "Email", "Plan", "Started At", "Due At", "Updated By", "Status", "Action"];
+    const employeeRoles = getEmployeeRoles({ data: employeeRolesData || undefined });
+    const employeeRoleColumns = ["Role", "Description", "Status", "Menu Access", ...(canUpdateRoles || canDeleteRoles ? ["Action"] : [])];
+    const employeeRoleRows = employeeRoles.map((role) => [
+      role.roleName,
+      role.description || "-",
+      role.status,
+      role.menuAccess?.length ?? "-",
+      ...(canUpdateRoles || canDeleteRoles
+        ? [
+          <div className="homepage-theme-row-actions">
+            {canUpdateRoles ? (
+              <button type="button" onClick={() => openEmployeeRoleModal(role)}>
+                <ActionIcon type="edit" />
+                Edit
+              </button>
+            ) : null}
+            {canDeleteRoles ? (
+              <button type="button" onClick={() => setDeletingEmployeeRole(role)}>
+                <ActionIcon type="delete" />
+                Delete
+              </button>
+            ) : null}
+          </div>,
+        ]
+        : []),
+    ]);
+    const subscriptionColumns = ["Name", "Mobile", "Email", "Plan", "Started At", "Due At", "Updated By", "Status", ...(canUpdateSubscriptions ? ["Action"] : [])];
     const subscriptionRows = usersData?.users.map((user) => [
       user.fullName,
       user.mobileNumber,
@@ -3096,18 +3621,22 @@ export default function Home() {
       formatDate(user.subscriptionDueAt),
       user.planUpdatedByUserName || "-",
       user.status,
-      <div className="subscription-actions">
-        <button className="table-action primary" type="button" onClick={() => loadSubscriptionPlans(user)}>
-          <ActionIcon type="edit" />
-          Update
-        </button>
-      </div>,
+      ...(canUpdateSubscriptions
+        ? [
+          <div className="subscription-actions">
+            <button className="table-action primary" type="button" onClick={() => loadSubscriptionPlans(user)}>
+              <ActionIcon type="edit" />
+              Update
+            </button>
+          </div>,
+        ]
+        : []),
     ]) ?? [];
     const notificationPageUserIds = notificationUsersData?.users.map((user) => user.publicId) || [];
     const areAllNotificationUsersSelected =
       notificationPageUserIds.length > 0 && notificationPageUserIds.every((id) => selectedNotificationUserIds.includes(id));
     const notificationUserColumns = [
-      <input checked={areAllNotificationUsersSelected} type="checkbox" onChange={toggleAllNotificationUsers} />,
+      ...(canCreateNotifications ? [<input checked={areAllNotificationUsersSelected} type="checkbox" onChange={toggleAllNotificationUsers} />] : []),
       "Name",
       "PAN",
       "DOB",
@@ -3115,10 +3644,12 @@ export default function Home() {
       "CIBIL Score",
       "Subscription Type",
       "Due Date",
-      "Action",
+      ...(canCreateNotifications ? ["Action"] : []),
     ];
     const notificationUserRows = notificationUsersData?.users.map((user) => [
-      <input checked={selectedNotificationUserIds.includes(user.publicId)} type="checkbox" onChange={() => toggleNotificationUser(user.publicId)} />,
+      ...(canCreateNotifications
+        ? [<input checked={selectedNotificationUserIds.includes(user.publicId)} type="checkbox" onChange={() => toggleNotificationUser(user.publicId)} />]
+        : []),
       user.fullName,
       user.panNumber || "-",
       formatDate(user.dob || user.dateOfBirth || null),
@@ -3126,9 +3657,13 @@ export default function Home() {
       user.creditScore || "-",
       user.subscriptionStatus || "-",
       formatDate(user.subscriptionDueAt),
-      <button className="table-action" type="button" onClick={() => openNotificationModal("users", user.publicId)}>
-        Send Notification
-      </button>,
+      ...(canCreateNotifications
+        ? [
+          <button className="table-action" type="button" onClick={() => openNotificationModal("users", user.publicId)}>
+            Send Notification
+          </button>,
+        ]
+        : []),
     ]) ?? [];
     const notificationColumns = ["Title", "Message", "User", "Screen", "Created At"];
     const notificationRows = notificationsData?.notifications.map((notification) => [
@@ -3138,7 +3673,22 @@ export default function Home() {
       notification.screen || notification.data?.screen || "-",
       formatDate(notification.createdAt || null),
     ]) ?? [];
-    const loanColumns = ["Name", "Mobile", "PAN", "Email", "Amount", "Loan Type", "Employment", "Income", "Experience", "Status", "Remarks", "Updated By", "Created At", "Action"];
+    const loanColumns = [
+      "Name",
+      "Mobile",
+      "PAN",
+      "Email",
+      "Amount",
+      "Loan Type",
+      "Employment",
+      "Income",
+      "Experience",
+      "Status",
+      "Remarks",
+      "Updated By",
+      "Created At",
+      ...(canExportLoans || canUpdateLoans ? ["Action"] : []),
+    ];
     const loanRows = loansData?.loans.map((loan) => [
       loan.user.fullName,
       loan.user.mobileNumber,
@@ -3153,15 +3703,23 @@ export default function Home() {
       loan.remarks || "-",
       loan.updatedBy ? `${loan.updatedBy.fullName} (${loan.updatedBy.mobileNumber})` : "-",
       formatDate(loan.createdAt),
-      <div className="table-actions">
-        <button className="table-action" disabled={downloadingLoanId === loan.id} type="button" onClick={() => downloadLoanDetails(loan)}>
-          {downloadingLoanId === loan.id ? "Downloading..." : "Download"}
-        </button>
-        <button className="table-action" type="button" onClick={() => openLoanUpdate(loan)}>
-          <ActionIcon type="edit" />
-          Update
-        </button>
-      </div>,
+      ...(canExportLoans || canUpdateLoans
+        ? [
+          <div className="table-actions">
+            {canExportLoans ? (
+              <button className="table-action" disabled={downloadingLoanId === loan.id} type="button" onClick={() => downloadLoanDetails(loan)}>
+                {downloadingLoanId === loan.id ? "Downloading..." : "Download"}
+              </button>
+            ) : null}
+            {canUpdateLoans ? (
+              <button className="table-action" type="button" onClick={() => openLoanUpdate(loan)}>
+                <ActionIcon type="edit" />
+                Update
+              </button>
+            ) : null}
+          </div>,
+        ]
+        : []),
     ]) ?? [];
     const chatColumns = ["User", "Mobile", "PAN", "Question ID", "Question", "Created At"];
     const chatRows = chatsData?.users?.flatMap((user) =>
@@ -3207,7 +3765,7 @@ export default function Home() {
             </button>
           </div>
           <nav>
-            {menuItems.map((item) => (
+            {menuItems.filter((item) => hasViewPermission(item as AppView)).map((item) => (
               <Fragment key={item}>
                 <button
                   className={activeView === item ? "active" : ""}
@@ -3219,101 +3777,90 @@ export default function Home() {
                 </button>
                 {item === "Dashboard" ? (
                   <>
-                    <div className={`sidebar-group ${activeView === "General" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "FAQs" ? "active" : ""}`}>
-                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
-                        <span className="menu-icon">{menuIcons.General}</span>
-                        General
-                        <span className="sidebar-chevron">{isGeneralMenuOpen ? "⌄" : "›"}</span>
-                      </button>
-                      {isGeneralMenuOpen ? (
-                        <div className="sidebar-submenu">
-                          <button className={activeView === "General" ? "active" : ""} type="button" onClick={() => openAdminView("General")}>
-                            <span className="menu-icon">{menuIcons["Site Settings"]}</span>
-                            Site Settings
-                          </button>
-                          <button className={activeView === "Homepage Themes" ? "active" : ""} type="button" onClick={() => openAdminView("Homepage Themes")}>
-                            <span className="menu-icon">{menuIcons["Homepage Themes"]}</span>
-                            Homepage Themes
-                          </button>
-                          <button className={activeView === "Legal Center" ? "active" : ""} type="button" onClick={() => openAdminView("Legal Center")}>
-                            <span className="menu-icon">{menuIcons["Legal Center"]}</span>
-                            Legal Center
-                          </button>
-                          <button className={activeView === "Notifications" ? "active" : ""} type="button" onClick={() => openAdminView("Notifications")}>
-                            <span className="menu-icon">{menuIcons.Notifications}</span>
-                            Notifications
-                          </button>
-                          <button className={activeView === "FAQs" ? "active" : ""} type="button" onClick={() => openAdminView("FAQs")}>
-                            <span className="menu-icon">{menuIcons.FAQ}</span>
-                            FAQ
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className={`sidebar-group ${activeView === "Users" ? "active" : ""}`}>
-                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsUserManagementMenuOpen((current) => !current)}>
-                        <span className="menu-icon">{menuIcons.Users}</span>
-                        User management
-                        <span className="sidebar-chevron">{isUserManagementMenuOpen ? "⌄" : "›"}</span>
-                      </button>
-                      {isUserManagementMenuOpen ? (
-                        <div className="sidebar-submenu">
-                          <button className={activeView === "Users" ? "active" : ""} type="button" onClick={() => openAdminView("Users")}>
-                            <span className="menu-icon">{menuIcons.Users}</span>
-                            Users
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className={`sidebar-group ${activeView === "Employees" ? "active" : ""}`}>
-                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsEmployeeManagementMenuOpen((current) => !current)}>
-                        <span className="menu-icon">{menuIcons.Users}</span>
-                        Employee management
-                        <span className="sidebar-chevron">{isEmployeeManagementMenuOpen ? "⌄" : "›"}</span>
-                      </button>
-                      {isEmployeeManagementMenuOpen ? (
-                        <div className="sidebar-submenu">
-                          <button className={activeView === "Employees" ? "active" : ""} type="button" onClick={() => openAdminView("Employees")}>
-                            <span className="menu-icon">{menuIcons.Users}</span>
-                            Employees
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className={`sidebar-group ${activeView === "Subscriptions" ? "active" : ""}`}>
-                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsSubscriptionsMenuOpen((current) => !current)}>
-                        <span className="menu-icon">{menuIcons.Subscriptions}</span>
-                        Subscriptions
-                        <span className="sidebar-chevron">{isSubscriptionsMenuOpen ? "⌄" : "›"}</span>
-                      </button>
-                      {isSubscriptionsMenuOpen ? (
-                        <div className="sidebar-submenu">
-                          <button className={activeView === "Subscriptions" ? "active" : ""} type="button" onClick={() => openAdminView("Subscriptions")}>
-                            <span className="menu-icon">{menuIcons.Subscriptions}</span>
-                            Subscriptions
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className={`sidebar-group ${activeView === "Plans & Benefits" ? "active" : ""}`}>
-                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsPlansBenefitsMenuOpen((current) => !current)}>
-                        <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
-                        Plans & Benefits
-                        <span className="sidebar-chevron">{isPlansBenefitsMenuOpen ? "⌄" : "›"}</span>
-                      </button>
-                      {isPlansBenefitsMenuOpen ? (
-                        <div className="sidebar-submenu">
-                          <button disabled type="button">
-                            <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
-                            Basic plan
-                          </button>
-                          <button className={activeView === "Plans & Benefits" && plansBenefitsTab === "repair" ? "active" : ""} type="button" onClick={() => openPlansBenefitsTab("repair")}>
-                            <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
-                            Repair service
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
+                    {["General", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].some((view) => hasViewPermission(view as AppView)) ? (
+                      <div className={`sidebar-group ${activeView === "General" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "FAQs" ? "active" : ""}`}>
+                        <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
+                          <span className="menu-icon">{menuIcons.General}</span>
+                          General
+                          <span className="sidebar-chevron">{isGeneralMenuOpen ? "⌄" : "›"}</span>
+                        </button>
+                        {isGeneralMenuOpen ? (
+                          <div className="sidebar-submenu">
+                            {hasViewPermission("General") ? <button className={activeView === "General" ? "active" : ""} type="button" onClick={() => openAdminView("General")}><span className="menu-icon">{menuIcons["Site Settings"]}</span>Site Settings</button> : null}
+                            {hasViewPermission("Homepage Themes") ? <button className={activeView === "Homepage Themes" ? "active" : ""} type="button" onClick={() => openAdminView("Homepage Themes")}><span className="menu-icon">{menuIcons["Homepage Themes"]}</span>Homepage Themes</button> : null}
+                            {hasViewPermission("Legal Center") ? <button className={activeView === "Legal Center" ? "active" : ""} type="button" onClick={() => openAdminView("Legal Center")}><span className="menu-icon">{menuIcons["Legal Center"]}</span>Legal Center</button> : null}
+                            {hasViewPermission("Notifications") ? <button className={activeView === "Notifications" ? "active" : ""} type="button" onClick={() => openAdminView("Notifications")}><span className="menu-icon">{menuIcons.Notifications}</span>Notifications</button> : null}
+                            {hasViewPermission("FAQs") ? <button className={activeView === "FAQs" ? "active" : ""} type="button" onClick={() => openAdminView("FAQs")}><span className="menu-icon">{menuIcons.FAQ}</span>FAQ</button> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {hasViewPermission("Users") ? (
+                      <div className={`sidebar-group ${activeView === "Users" ? "active" : ""}`}>
+                        <button className="sidebar-group-toggle" type="button" onClick={() => setIsUserManagementMenuOpen((current) => !current)}>
+                          <span className="menu-icon">{menuIcons.Users}</span>
+                          User management
+                          <span className="sidebar-chevron">{isUserManagementMenuOpen ? "⌄" : "›"}</span>
+                        </button>
+                        {isUserManagementMenuOpen ? (
+                          <div className="sidebar-submenu">
+                            <button className={activeView === "Users" ? "active" : ""} type="button" onClick={() => openAdminView("Users")}>
+                              <span className="menu-icon">{menuIcons.Users}</span>
+                              Users
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {hasViewPermission("Employees") || hasViewPermission("Roles") ? (
+                      <div className={`sidebar-group ${activeView === "Employees" || activeView === "Roles" ? "active" : ""}`}>
+                        <button className="sidebar-group-toggle" type="button" onClick={() => setIsEmployeeManagementMenuOpen((current) => !current)}>
+                          <span className="menu-icon">{menuIcons.Users}</span>
+                          Employee management
+                          <span className="sidebar-chevron">{isEmployeeManagementMenuOpen ? "⌄" : "›"}</span>
+                        </button>
+                        {isEmployeeManagementMenuOpen ? (
+                          <div className="sidebar-submenu">
+                            {hasViewPermission("Employees") ? <button className={activeView === "Employees" ? "active" : ""} type="button" onClick={() => openAdminView("Employees")}><span className="menu-icon">{menuIcons.Users}</span>Employees</button> : null}
+                            {hasViewPermission("Roles") ? <button className={activeView === "Roles" ? "active" : ""} type="button" onClick={() => openAdminView("Roles")}><span className="menu-icon">{menuIcons.Users}</span>Roles</button> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {hasViewPermission("Subscriptions") ? (
+                      <div className={`sidebar-group ${activeView === "Subscriptions" ? "active" : ""}`}>
+                        <button className="sidebar-group-toggle" type="button" onClick={() => setIsSubscriptionsMenuOpen((current) => !current)}>
+                          <span className="menu-icon">{menuIcons.Subscriptions}</span>
+                          Subscriptions
+                          <span className="sidebar-chevron">{isSubscriptionsMenuOpen ? "⌄" : "›"}</span>
+                        </button>
+                        {isSubscriptionsMenuOpen ? (
+                          <div className="sidebar-submenu">
+                            <button className={activeView === "Subscriptions" ? "active" : ""} type="button" onClick={() => openAdminView("Subscriptions")}>
+                              <span className="menu-icon">{menuIcons.Subscriptions}</span>
+                              Subscriptions
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {hasViewPermission("Plans & Benefits") ? (
+                      <div className={`sidebar-group ${activeView === "Plans & Benefits" ? "active" : ""}`}>
+                        <button className="sidebar-group-toggle" type="button" onClick={() => setIsPlansBenefitsMenuOpen((current) => !current)}>
+                          <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
+                          Plans & Benefits
+                          <span className="sidebar-chevron">{isPlansBenefitsMenuOpen ? "⌄" : "›"}</span>
+                        </button>
+                        {isPlansBenefitsMenuOpen ? (
+                          <div className="sidebar-submenu">
+                            <button className={activeView === "Plans & Benefits" && plansBenefitsTab === "repair" ? "active" : ""} type="button" onClick={() => openPlansBenefitsTab("repair")}>
+                              <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
+                              Repair service
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
               </Fragment>
@@ -3410,11 +3957,13 @@ export default function Home() {
                       onChange={(event) => setGeneralSettings((settings) => ({ ...settings, selectedLanguage: event.target.value }))}
                     />
                   </label> */}
-                  <div className="general-actions">
-                    <button disabled={isGeneralLoading || isGeneralSaving} type="submit">
-                      {isGeneralSaving ? "Saving..." : "Save Changes"}
-                    </button>
-                  </div>
+                  {canUpdateGeneral ? (
+                    <div className="general-actions">
+                      <button disabled={isGeneralLoading || isGeneralSaving} type="submit">
+                        {isGeneralSaving ? "Saving..." : "Save Changes"}
+                      </button>
+                    </div>
+                  ) : null}
                 </form>
               </>
             ) : activeView === "Homepage Themes" ? (
@@ -3430,12 +3979,14 @@ export default function Home() {
                 {homepageThemesError ? <p className="dashboard-error">{homepageThemesError}</p> : null}
 
                 <section className="homepage-themes-panel panel">
-                  <div className="homepage-themes-actions">
-                    <button type="button" onClick={() => openHomepageThemeModal()}>
-                      <ActionIcon type="add" />
-                      Add
-                    </button>
-                  </div>
+                  {canCreateHomepageThemes ? (
+                    <div className="homepage-themes-actions">
+                      <button type="button" onClick={() => openHomepageThemeModal()}>
+                        <ActionIcon type="add" />
+                        Add
+                      </button>
+                    </div>
+                  ) : null}
 
                   {isHomepageThemesLoading ? <p className="dashboard-error">Loading homepage themes...</p> : null}
 
@@ -3471,14 +4022,18 @@ export default function Home() {
                               </td>
                               <td>
                                 <div className="homepage-theme-row-actions">
-                                  <button type="button" onClick={() => openHomepageThemeModal(theme)}>
-                                    <ActionIcon type="edit" />
-                                    Update
-                                  </button>
-                                  <button type="button" onClick={() => openDeleteHomepageThemeModal(theme)}>
-                                    <ActionIcon type="delete" />
-                                    Delete
-                                  </button>
+                                  {canUpdateHomepageThemes ? (
+                                    <button type="button" onClick={() => openHomepageThemeModal(theme)}>
+                                      <ActionIcon type="edit" />
+                                      Update
+                                    </button>
+                                  ) : null}
+                                  {canDeleteHomepageThemes ? (
+                                    <button type="button" onClick={() => openDeleteHomepageThemeModal(theme)}>
+                                      <ActionIcon type="delete" />
+                                      Delete
+                                    </button>
+                                  ) : null}
                                 </div>
                               </td>
                             </tr>
@@ -3522,11 +4077,13 @@ export default function Home() {
                     value={legalContent.consent}
                     onChange={(value) => setLegalContent((content) => ({ ...content, consent: value }))}
                   />
-                  <div className="general-actions">
-                    <button disabled={isLegalContentLoading || isLegalContentSaving} type="submit">
-                      {isLegalContentSaving ? "Saving..." : "Save Changes"}
-                    </button>
-                  </div>
+                  {canUpdateLegal ? (
+                    <div className="general-actions">
+                      <button disabled={isLegalContentLoading || isLegalContentSaving} type="submit">
+                        {isLegalContentSaving ? "Saving..." : "Save Changes"}
+                      </button>
+                    </div>
+                  ) : null}
                 </form>
               </>
             ) : activeView === "Notifications" ? (
@@ -3572,9 +4129,11 @@ export default function Home() {
                       <button type="button" onClick={() => loadAdminNotifications(1)}>
                         Search
                       </button>
-                      <button type="button" onClick={() => openNotificationModal("all")}>
-                        Send All
-                      </button>
+                      {canCreateNotifications ? (
+                        <button type="button" onClick={() => openNotificationModal("all")}>
+                          Send All
+                        </button>
+                      ) : null}
                     </section>
 
                     <CommonTable
@@ -3607,9 +4166,11 @@ export default function Home() {
                       <button type="button" onClick={() => loadNotificationUsers(1)}>
                         Search
                       </button>
-                      <button type="button" onClick={() => openNotificationModal("users")}>
-                        Send Selected
-                      </button>
+                      {canCreateNotifications ? (
+                        <button type="button" onClick={() => openNotificationModal("users")}>
+                          Send Selected
+                        </button>
+                      ) : null}
                     </section>
 
                     <CommonTable
@@ -3645,13 +4206,17 @@ export default function Home() {
 
                 <form className="faqs-form" onSubmit={updateFaqs}>
                   <div className="faq-page-actions">
-                    <button type="button" onClick={addFaqCategory}>
-                      <ActionIcon type="add" />
-                      Add Category
-                    </button>
-                    <button disabled={isFaqsLoading || isFaqsSaving} type="submit">
-                      {isFaqsSaving ? "Saving..." : "Save FAQs"}
-                    </button>
+                    {canCreateFaqs ? (
+                      <button type="button" onClick={addFaqCategory}>
+                        <ActionIcon type="add" />
+                        Add Category
+                      </button>
+                    ) : null}
+                    {canUpdateFaqs ? (
+                      <button disabled={isFaqsLoading || isFaqsSaving} type="submit">
+                        {isFaqsSaving ? "Saving..." : "Save FAQs"}
+                      </button>
+                    ) : null}
                   </div>
 
                   {isFaqsLoading ? <p className="dashboard-error">Loading FAQs...</p> : null}
@@ -3670,10 +4235,12 @@ export default function Home() {
                           <h3>{category.categoryLabel || "New Category"}</h3>
                           <p>{category.questions.length} FAQs</p>
                         </div>
-                        <button type="button" onClick={() => removeFaqCategory(categoryIndex)}>
-                          <ActionIcon type="delete" />
-                          Remove Category
-                        </button>
+                        {canDeleteFaqs ? (
+                          <button type="button" onClick={() => removeFaqCategory(categoryIndex)}>
+                            <ActionIcon type="delete" />
+                            Remove Category
+                          </button>
+                        ) : null}
                       </div>
 
                       <details className="faq-category-settings">
@@ -3710,10 +4277,12 @@ export default function Home() {
                         <div className="faq-question" key={question.publicId || question.id || questionIndex}>
                           <div className="faq-question-header">
                             <strong>FAQ {questionIndex + 1}</strong>
-                            <button type="button" onClick={() => removeFaqQuestion(categoryIndex, questionIndex)}>
-                              <ActionIcon type="delete" />
-                              Remove
-                            </button>
+                            {canDeleteFaqs ? (
+                              <button type="button" onClick={() => removeFaqQuestion(categoryIndex, questionIndex)}>
+                                <ActionIcon type="delete" />
+                                Remove
+                              </button>
+                            ) : null}
                           </div>
                           <div className="faq-question-top">
                             <label>
@@ -3754,10 +4323,12 @@ export default function Home() {
                         </div>
                       ))}
 
-                      <button className="faq-add-question" type="button" onClick={() => addFaqQuestion(categoryIndex)}>
-                        <ActionIcon type="add" />
-                        Add FAQ
-                      </button>
+                      {canCreateFaqs ? (
+                        <button className="faq-add-question" type="button" onClick={() => addFaqQuestion(categoryIndex)}>
+                          <ActionIcon type="add" />
+                          Add FAQ
+                        </button>
+                      ) : null}
                     </section>
                   ))}
                 </form>
@@ -3828,19 +4399,21 @@ export default function Home() {
 
                 {plansBenefitsTab === "plans" ? (
                   <>
-                    <div className="plans-toolbar">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingAdminPlanId(null);
-                          setAdminPlanForm(emptyAdminPlanForm);
-                          setIsAdminPlanModalOpen(true);
-                        }}
-                      >
-                        <ActionIcon type="add" />
-                        Add Plan
-                      </button>
-                    </div>
+                    {canCreatePlans ? (
+                      <div className="plans-toolbar">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAdminPlanId(null);
+                            setAdminPlanForm(emptyAdminPlanForm);
+                            setIsAdminPlanModalOpen(true);
+                          }}
+                        >
+                          <ActionIcon type="add" />
+                          Add Plan
+                        </button>
+                      </div>
+                    ) : null}
 
                     <section className="admin-plans-list">
                       {adminPlans.map((plan) => (
@@ -3861,15 +4434,21 @@ export default function Home() {
                             <p>{plan.recommendedFor || plan.description || "-"}</p>
                           </div>
                           <em className={plan.isActive === false ? "inactive" : ""}>{plan.isActive === false ? "Inactive" : "Active"}</em>
-                          <div className="table-actions">
-                            <button className="table-action" type="button" onClick={() => editAdminPlan(plan)}>
-                              <ActionIcon type="edit" />
-                              Edit
-                            </button>
-                            <button className="table-action" disabled={plan.isActive === false || isAdminPlanSaving} type="button" onClick={() => inactiveAdminPlan(plan)}>
-                              Inactive
-                            </button>
-                          </div>
+                          {canUpdatePlans || canDeletePlans ? (
+                            <div className="table-actions">
+                              {canUpdatePlans ? (
+                                <button className="table-action" type="button" onClick={() => editAdminPlan(plan)}>
+                                  <ActionIcon type="edit" />
+                                  Edit
+                                </button>
+                              ) : null}
+                              {canDeletePlans ? (
+                                <button className="table-action" disabled={plan.isActive === false || isAdminPlanSaving} type="button" onClick={() => inactiveAdminPlan(plan)}>
+                                  Inactive
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </article>
                       ))}
                     </section>
@@ -3878,10 +4457,12 @@ export default function Home() {
                   <form className="admin-plan-form panel" onSubmit={saveCibilRepairContent}>
                     <div className="admin-plan-form-header">
                       <h3>{cibilRepairTab === "plans" ? "Repair Plans" : "Timelines"}</h3>
-                      <button type="button" onClick={cibilRepairTab === "plans" ? addCibilRepairPlan : addCibilRepairTimeline}>
-                        <ActionIcon type="add" />
-                        {cibilRepairTab === "plans" ? "Add Plan" : "Add Timeline"}
-                      </button>
+                      {canCreatePlans ? (
+                        <button type="button" onClick={cibilRepairTab === "plans" ? addCibilRepairPlan : addCibilRepairTimeline}>
+                          <ActionIcon type="add" />
+                          {cibilRepairTab === "plans" ? "Add Plan" : "Add Timeline"}
+                        </button>
+                      ) : null}
                     </div>
 
                     {isCibilRepairLoading ? (
@@ -3944,10 +4525,12 @@ export default function Home() {
                                   <input checked={timeline.isActive} type="checkbox" onChange={(event) => updateCibilRepairTimeline(index, "isActive", event.target.checked)} />
                                   Active
                                 </label>
-                                <button className="table-action danger-action" disabled={isCibilRepairSaving} type="button" onClick={() => setDeletingCibilRepairTimelineIndex(index)}>
-                                  <ActionIcon type="delete" />
-                                  Remove
-                                </button>
+                                {canDeletePlans ? (
+                                  <button className="table-action danger-action" disabled={isCibilRepairSaving} type="button" onClick={() => setDeletingCibilRepairTimelineIndex(index)}>
+                                    <ActionIcon type="delete" />
+                                    Remove
+                                  </button>
+                                ) : null}
                               </div>
                             </section>
                           ))
@@ -3955,11 +4538,13 @@ export default function Home() {
                       </>
                     )}
 
-                    <footer className="modal-actions">
-                      <button disabled={isCibilRepairSaving || isCibilRepairLoading} type="submit">
-                        {isCibilRepairSaving ? "Saving..." : cibilRepairTab === "timelines" ? "Save Timelines" : "Save Repair Content"}
-                      </button>
-                    </footer>
+                    {canUpdatePlans ? (
+                      <footer className="modal-actions">
+                        <button disabled={isCibilRepairSaving || isCibilRepairLoading} type="submit">
+                          {isCibilRepairSaving ? "Saving..." : cibilRepairTab === "timelines" ? "Save Timelines" : "Save Repair Content"}
+                        </button>
+                      </footer>
+                    ) : null}
                   </form>
                 ) : (
                   <section className="benefits-list">
@@ -4098,9 +4683,11 @@ export default function Home() {
                   <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>
                     Filter
                   </button>
-                  <button disabled={isExporting} type="button" onClick={exportUsers}>
-                    {isExporting ? "Exporting..." : "Export"}
-                  </button>
+                  {canExportUsers ? (
+                    <button disabled={isExporting} type="button" onClick={exportUsers}>
+                      {isExporting ? "Exporting..." : "Export"}
+                    </button>
+                  ) : null}
                 </div>
 
                 <section className={`table-toolbar has-export ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
@@ -4117,9 +4704,11 @@ export default function Home() {
                   <button type="button" onClick={() => loadUsers(1)}>
                     Search
                   </button>
-                  <button disabled={isExporting} type="button" onClick={exportUsers}>
-                    {isExporting ? "Exporting..." : "Export"}
-                  </button>
+                  {canExportUsers ? (
+                    <button disabled={isExporting} type="button" onClick={exportUsers}>
+                      {isExporting ? "Exporting..." : "Export"}
+                    </button>
+                  ) : null}
                 </section>
 
                 {usersError ? <p className="dashboard-error">{usersError}</p> : null}
@@ -4165,9 +4754,12 @@ export default function Home() {
                   <button type="button" onClick={() => loadEmployees(1)}>
                     Search
                   </button>
-                  <button type="button" onClick={() => openEmployeeModal()}>
-                    Add Employee
-                  </button>
+                  {canCreateEmployees ? (
+                    <button type="button" onClick={() => openEmployeeModal()}>
+                      <ActionIcon type="add" />
+                      Add Employee
+                    </button>
+                  ) : null}
                 </section>
 
                 {employeesError ? <p className="dashboard-error">{employeesError}</p> : null}
@@ -4189,6 +4781,158 @@ export default function Home() {
                   rows={employeeRows}
                 />
               </>
+            ) : activeView === "Roles" ? (
+              <>
+                {isEmployeeRoleModalOpen ? (
+                  <>
+                    <section className="welcome-panel">
+                      <div>
+                        <h2>{editingEmployeeRoleId ? "Edit Role" : "Add Role"}</h2>
+                        <p>Employee Management</p>
+                      </div>
+                      <button className="role-back-button" type="button" onClick={closeEmployeeRoleForm} aria-label="Back">
+                        <ActionIcon type="back" />
+                      </button>
+                    </section>
+
+                    {employeeRolesError ? <p className="dashboard-error">{employeeRolesError}</p> : null}
+
+                    <form className="admin-plan-form employee-role-page-form" onSubmit={saveEmployeeRole}>
+                      <div className="admin-plan-grid employee-role-details-grid">
+                        <label>
+                          Role Name
+                          <input required value={employeeRoleForm.roleName} onChange={(event) => setEmployeeRoleForm((role) => ({ ...role, roleName: event.target.value }))} />
+                        </label>
+                        <label>
+                          Status
+                          <select value={employeeRoleForm.status} onChange={(event) => setEmployeeRoleForm((role) => ({ ...role, status: event.target.value }))}>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label>
+                        Description
+                        <textarea value={employeeRoleForm.description} onChange={(event) => setEmployeeRoleForm((role) => ({ ...role, description: event.target.value }))} />
+                      </label>
+                      <section className="employee-role-access-list">
+                        <div className="employee-role-access-title">
+                          <strong>Page Access</strong>
+                          <label className="employee-role-select-all">
+                            <input
+                              checked={isAllEmployeeRoleAccessSelected()}
+                              type="checkbox"
+                              onChange={toggleAllEmployeeRoleAccess}
+                            />
+                            Select All
+                          </label>
+                        </div>
+                        {employeeMenuAccess.map((access) => {
+                          const accessKey = getEmployeeRoleAccessKey(access);
+                          const selectedAccess = getSelectedEmployeeRoleAccess(access);
+                          const viewPermission = getViewPermission(access);
+                          const isExpanded = expandedEmployeeRoleAccess.includes(accessKey);
+
+                          return (
+                            <div className="employee-role-access-item" key={accessKey}>
+                              <div className="employee-role-access-header">
+                                <label>
+                                  <input
+                                    checked={Boolean(selectedAccess)}
+                                    type="checkbox"
+                                    onChange={() => toggleEmployeeRoleAccess(access)}
+                                  />
+                                  {access.menuName}{access.childMenuName ? ` / ${access.childMenuName}` : ""}
+                                </label>
+                                <button type="button" onClick={() => toggleEmployeeRoleAccessExpansion(access)}>
+                                  {isExpanded ? "−" : "+"}
+                                </button>
+                              </div>
+                              {isExpanded ? (
+                                <div className="employee-role-actions">
+                                  {access.permissions.map((permission) => (
+                                    <label key={permission}>
+                                      <input
+                                        checked={permission === viewPermission ? Boolean(selectedAccess) : Boolean(selectedAccess?.permissions.includes(permission))}
+                                        disabled={permission === viewPermission}
+                                        type="checkbox"
+                                        onChange={() => toggleEmployeeRolePermission(access, permission)}
+                                      />
+                                      {permission}
+                                    </label>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </section>
+                      <footer className="modal-actions">
+                        <button type="button" onClick={closeEmployeeRoleForm}>
+                          Cancel
+                        </button>
+                        {(editingEmployeeRoleId ? canUpdateRoles : canCreateRoles) ? (
+                          <button disabled={isEmployeeRolesLoading} type="submit">
+                            {isEmployeeRolesLoading ? "Saving..." : editingEmployeeRoleId ? "Update" : "Add"}
+                          </button>
+                        ) : null}
+                      </footer>
+                    </form>
+                  </>
+                ) : (
+                  <>
+                    <section className="welcome-panel">
+                      <div>
+                        <h2>Roles</h2>
+                        <p>Manage employee role access</p>
+                      </div>
+                      <span>{employeeRoles.length} roles</span>
+                    </section>
+
+                    <section className="table-toolbar notification-users-toolbar">
+                      <input
+                        placeholder="Search roles..."
+                        value={employeeRolesSearch}
+                        onChange={(event) => setEmployeeRolesSearch(event.target.value)}
+                      />
+                      <button className="icon-button" title="Reset roles" type="button" onClick={() => {
+                        setEmployeeRolesSearch("");
+                        loadEmployeeRoles(1, "");
+                      }}>
+                        ↻
+                      </button>
+                      <button type="button" onClick={() => loadEmployeeRoles(1)}>
+                        Search
+                      </button>
+                      {canCreateRoles ? (
+                        <button type="button" onClick={() => openEmployeeRoleModal()}>
+                          Add Role
+                        </button>
+                      ) : null}
+                    </section>
+
+                    {employeeRolesError ? <p className="dashboard-error">{employeeRolesError}</p> : null}
+
+                    <CommonTable
+                      columns={employeeRoleColumns}
+                      emptyText={isEmployeeRolesLoading ? "Loading roles..." : "No roles found"}
+                      isLoading={isEmployeeRolesLoading}
+                      pagination={
+                        employeeRolesData?.pagination
+                          ? {
+                            page: employeeRolesData.pagination.page,
+                            totalPages: employeeRolesData.pagination.totalPages,
+                            onPrevious: () => loadEmployeeRoles(employeeRolesData.pagination!.page - 1),
+                            onNext: () => loadEmployeeRoles(employeeRolesData.pagination!.page + 1),
+                          }
+                          : undefined
+                      }
+                      rows={employeeRoleRows}
+                    />
+
+                  </>
+                )}
+              </>
             ) : activeView === "Subscriptions" ? (
               <>
                 <section className="welcome-panel">
@@ -4203,9 +4947,11 @@ export default function Home() {
                   <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>
                     Filter
                   </button>
-                  <button disabled={isExporting} type="button" onClick={exportUsers}>
-                    {isExporting ? "Exporting..." : "Export"}
-                  </button>
+                  {canExportUsers ? (
+                    <button disabled={isExporting} type="button" onClick={exportUsers}>
+                      {isExporting ? "Exporting..." : "Export"}
+                    </button>
+                  ) : null}
                 </div>
 
                 <section className={`table-toolbar has-export ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
@@ -4222,9 +4968,11 @@ export default function Home() {
                   <button type="button" onClick={() => loadUsers(1)}>
                     Search
                   </button>
-                  <button disabled={isExporting} type="button" onClick={exportUsers}>
-                    {isExporting ? "Exporting..." : "Export"}
-                  </button>
+                  {canExportUsers ? (
+                    <button disabled={isExporting} type="button" onClick={exportUsers}>
+                      {isExporting ? "Exporting..." : "Export"}
+                    </button>
+                  ) : null}
                 </section>
 
                 {usersError ? <p className="dashboard-error">{usersError}</p> : null}
@@ -4250,9 +4998,11 @@ export default function Home() {
                   <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>
                     Filter
                   </button>
-                  <button disabled={isLoansExporting} type="button" onClick={exportLoans}>
-                    {isLoansExporting ? "Exporting..." : "Export"}
-                  </button>
+                  {canExportLoans ? (
+                    <button disabled={isLoansExporting} type="button" onClick={exportLoans}>
+                      {isLoansExporting ? "Exporting..." : "Export"}
+                    </button>
+                  ) : null}
                 </div>
 
                 <section className={`table-toolbar loan-toolbar has-export ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
@@ -4275,9 +5025,11 @@ export default function Home() {
                   <button type="button" onClick={() => loadLoans(1)}>
                     Search
                   </button>
-                  <button disabled={isLoansExporting} type="button" onClick={exportLoans}>
-                    {isLoansExporting ? "Exporting..." : "Export"}
-                  </button>
+                  {canExportLoans ? (
+                    <button disabled={isLoansExporting} type="button" onClick={exportLoans}>
+                      {isLoansExporting ? "Exporting..." : "Export"}
+                    </button>
+                  ) : null}
                 </section>
 
                 {loansError ? <p className="dashboard-error">{loansError}</p> : null}
@@ -4525,22 +5277,24 @@ export default function Home() {
                   <button type="button" onClick={closeHomepageThemeModal}>
                     Cancel
                   </button>
-                  <button disabled={savingHomepageTheme === homepageThemeForm.imageName} type="submit">
-                    {savingHomepageTheme === homepageThemeForm.imageName ? (
-                      "Saving..."
-                    ) : (
-                      <>
-                        <ActionIcon type={homepageThemeForm.originalImageName ? "edit" : "add"} />
-                        {homepageThemeForm.originalImageName ? "Update" : "Add"}
-                      </>
-                    )}
-                  </button>
+                  {(homepageThemeForm.originalImageName ? canUpdateHomepageThemes : canCreateHomepageThemes) ? (
+                    <button disabled={savingHomepageTheme === homepageThemeForm.imageName} type="submit">
+                      {savingHomepageTheme === homepageThemeForm.imageName ? (
+                        "Saving..."
+                      ) : (
+                        <>
+                          <ActionIcon type={homepageThemeForm.originalImageName ? "edit" : "add"} />
+                          {homepageThemeForm.originalImageName ? "Update" : "Add"}
+                        </>
+                      )}
+                    </button>
+                  ) : null}
                 </footer>
               </form>
             </section>
           </div>
         ) : null}
-        {deletingHomepageTheme ? (
+        {deletingHomepageTheme && canDeleteHomepageThemes ? (
           <div className="modal-backdrop">
 
             <section className="plan-modal confirm-delete-modal">
@@ -4568,7 +5322,7 @@ export default function Home() {
 
           </div>
         ) : null}
-        {deletingCibilRepairTimelineIndex !== null ? (
+        {deletingCibilRepairTimelineIndex !== null && canDeletePlans ? (
           <div className="modal-backdrop">
             <section className="plan-modal confirm-delete-modal">
               <h4>Are you sure want to delete?</h4>
@@ -4594,7 +5348,7 @@ export default function Home() {
             </section>
           </div>
         ) : null}
-        {isNotificationModalOpen ? (
+        {isNotificationModalOpen && canCreateNotifications ? (
           <div className="modal-backdrop">
             <section className="plan-modal admin-plan-modal notification-modal">
               <header>
@@ -4633,7 +5387,7 @@ export default function Home() {
         ) : null}
         {isEmployeeModalOpen ? (
           <div className="modal-backdrop">
-            <section className="plan-modal admin-plan-modal">
+            <section className="plan-modal admin-plan-modal employee-modal">
               <header>
                 <div>
                   <h3>{editingEmployeeId ? "Edit Employee" : "Add Employee"}</h3>
@@ -4646,10 +5400,6 @@ export default function Home() {
 
               <form className="admin-plan-form modal-plan-form" onSubmit={saveEmployee}>
                 <div className="admin-plan-grid">
-                  <label>
-                    Employee Code
-                    <input required value={employeeForm.employeeCode} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, employeeCode: event.target.value }))} />
-                  </label>
                   <label>
                     Full Name
                     <input required value={employeeForm.fullName} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, fullName: event.target.value }))} />
@@ -4664,7 +5414,24 @@ export default function Home() {
                   </label>
                   <label>
                     Role
-                    <input required value={employeeForm.role} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, role: event.target.value }))} />
+                    <select
+                      value={employeeForm.rolePublicId}
+                      onChange={(event) => {
+                        const role = employeeRoles.find((item) => item.publicId === event.target.value);
+                        setEmployeeForm((employee) => ({
+                          ...employee,
+                          rolePublicId: event.target.value,
+                          role: role?.roleName || "",
+                        }));
+                      }}
+                    >
+                      <option value="">Select Role</option>
+                      {employeeRoles.map((role) => (
+                        <option key={role.publicId} value={role.publicId}>
+                          {role.roleName}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label>
                     Department
@@ -4683,22 +5450,29 @@ export default function Home() {
                   </label>
                   <label>
                     Joined At
-                    <input required type="date" value={employeeForm.joinedAt} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, joinedAt: event.target.value }))} />
+                    <DateFilter
+                      className="employee-joined-date"
+                      label="Joined At"
+                      value={employeeForm.joinedAt}
+                      onChange={(value) => setEmployeeForm((employee) => ({ ...employee, joinedAt: value }))}
+                    />
                   </label>
                 </div>
                 <footer className="modal-actions">
                   <button type="button" onClick={() => setIsEmployeeModalOpen(false)}>
                     Cancel
                   </button>
-                  <button disabled={isEmployeeSaving} type="submit">
-                    {isEmployeeSaving ? "Saving..." : editingEmployeeId ? "Update" : "Add"}
-                  </button>
+                  {(editingEmployeeId ? canUpdateEmployees : canCreateEmployees) ? (
+                    <button disabled={isEmployeeSaving} type="submit">
+                      {isEmployeeSaving ? "Saving..." : editingEmployeeId ? "Update" : "Add"}
+                    </button>
+                  ) : null}
                 </footer>
               </form>
             </section>
           </div>
         ) : null}
-        {deletingEmployee ? (
+        {deletingEmployee && canDeleteEmployees ? (
           <div className="modal-backdrop">
             <section className="plan-modal confirm-delete-modal">
               <p>Are you sure want to delete?</p>
@@ -4708,6 +5482,21 @@ export default function Home() {
                 </button>
                 <button className="danger-action" disabled={isEmployeeSaving} type="button" onClick={deleteEmployee}>
                   {isEmployeeSaving ? "Deleting..." : "Delete"}
+                </button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
+        {deletingEmployeeRole && canDeleteRoles ? (
+          <div className="modal-backdrop">
+            <section className="plan-modal confirm-delete-modal">
+              <p>Are you sure want to delete?</p>
+              <footer className="modal-actions">
+                <button disabled={isEmployeeRolesLoading} type="button" onClick={() => setDeletingEmployeeRole(null)}>
+                  Cancel
+                </button>
+                <button className="danger-action" disabled={isEmployeeRolesLoading} type="button" onClick={deleteEmployeeRole}>
+                  {isEmployeeRolesLoading ? "Deleting..." : "Delete"}
                 </button>
               </footer>
             </section>
@@ -4809,16 +5598,18 @@ export default function Home() {
                   >
                     Cancel
                   </button>
-                  <button disabled={isAdminPlanSaving} type="submit">
-                    {isAdminPlanSaving ? (
-                      "Saving..."
-                    ) : (
-                      <>
-                        <ActionIcon type={editingAdminPlanId ? "edit" : "add"} />
-                        {editingAdminPlanId ? "Update Plan" : "Add Plan"}
-                      </>
-                    )}
-                  </button>
+                  {(editingAdminPlanId ? canUpdatePlans : canCreatePlans) ? (
+                    <button disabled={isAdminPlanSaving} type="submit">
+                      {isAdminPlanSaving ? (
+                        "Saving..."
+                      ) : (
+                        <>
+                          <ActionIcon type={editingAdminPlanId ? "edit" : "add"} />
+                          {editingAdminPlanId ? "Update Plan" : "Add Plan"}
+                        </>
+                      )}
+                    </button>
+                  ) : null}
                 </footer>
               </form>
             </section>
@@ -4873,9 +5664,11 @@ export default function Home() {
                 <button type="button" onClick={() => setSelectedSubscriptionUser(null)}>
                   Cancel
                 </button>
-                <button disabled={isUpdatingPlan || !planAmount} type="button" onClick={updateSubscriptionPlan}>
-                  {isUpdatingPlan ? "Updating..." : "Submit"}
-                </button>
+                {canUpdateSubscriptions ? (
+                  <button disabled={isUpdatingPlan || !planAmount} type="button" onClick={updateSubscriptionPlan}>
+                    {isUpdatingPlan ? "Updating..." : "Submit"}
+                  </button>
+                ) : null}
               </footer>
             </section>
           </div>
@@ -4922,9 +5715,11 @@ export default function Home() {
                 <button type="button" onClick={() => setSelectedLoan(null)}>
                   Cancel
                 </button>
-                <button disabled={isUpdatingLoan} type="button" onClick={updateLoanStatus}>
-                  {isUpdatingLoan ? "Updating..." : "Submit"}
-                </button>
+                {canUpdateLoans ? (
+                  <button disabled={isUpdatingLoan} type="button" onClick={updateLoanStatus}>
+                    {isUpdatingLoan ? "Updating..." : "Submit"}
+                  </button>
+                ) : null}
               </footer>
             </section>
           </div>
