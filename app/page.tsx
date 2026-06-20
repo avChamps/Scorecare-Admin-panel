@@ -20,7 +20,7 @@ import {
 } from "recharts";
 import { API_BASE_URL } from "./api/api";
 
-const menuItems = ["Dashboard", /* "Loans", */ "Chats", "Feedback", "Contact Us"];
+const menuItems = ["Dashboard", /* "Loans", */ "Chats", "Feedback", "Contact Us", "API Logs"];
 const menuIcons: Record<string, ReactNode> = {
   Dashboard: (
     <svg viewBox="0 0 24 24">
@@ -110,6 +110,11 @@ const menuIcons: Record<string, ReactNode> = {
       <path d="M6 3h9l3 3v15H6zM14 3v4h4M9 16v-3M12 16V9M15 16v-5" />
     </svg>
   ),
+  "API Logs": (
+    <svg viewBox="0 0 24 24">
+      <path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5" />
+    </svg>
+  ),
 };
 const dashboardIcons: Record<string, ReactNode> = {
   users: menuIcons.Users,
@@ -133,6 +138,7 @@ const dashboardIcons: Record<string, ReactNode> = {
       <path d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6zM9 12l2 2 4-4" />
     </svg>
   ),
+  apiLogs: menuIcons["API Logs"],
 };
 const loanTypeOptions = [
   { label: "Personal Loan", value: "personal" },
@@ -183,6 +189,7 @@ type DashboardCounts = {
   reportsWithScore?: number;
   totalNotifications?: number;
   unreadNotifications?: number;
+  apiHistoryCount?: number;
   employees?: {
     total: number;
     active: number;
@@ -220,7 +227,7 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
 
 type ManualReportType = "experian" | "cibil" | "crif";
 
@@ -249,6 +256,7 @@ const viewRoutes: Record<AppView, string> = {
   "Report Downloads": "/reports/downloads",
   "Download CIBIL": "/reports/download-cibil",
   "Manual Report": "/reports/manual-report",
+  "API Logs": "/api-logs",
 };
 
 const routeViews: Record<string, AppView> = {
@@ -265,6 +273,7 @@ const routeViews: Record<string, AppView> = {
   "/reports/downloads": "Report Downloads",
   "/reports/download-cibil": "Download CIBIL",
   "/reports/manual-report": "Manual Report",
+  "/api-logs": "API Logs",
   "/users": "Users",
   "/employees": "Employees",
   "/roles": "Roles",
@@ -292,6 +301,7 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   "Report Downloads": { menuName: "Reports", childMenuName: "Downloads" },
   "Download CIBIL": { menuName: "Reports", childMenuName: "Download CIBIL" },
   "Manual Report": { menuName: "Reports", childMenuName: "Manual Report" },
+  "API Logs": { menuName: "API Logs", childMenuName: null },
 };
 
 type ActionIconType = "add" | "edit" | "delete" | "back";
@@ -622,6 +632,43 @@ type CreditReportDownload = {
 
 type CreditReportDownloadsResponse = {
   downloads: CreditReportDownload[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+type CreditBureauApiHit = {
+  publicId: string;
+  bureauType: string;
+  operationType: string;
+  endpoint: string;
+  httpMethod: string;
+  mobile: string | null;
+  pan: string | null;
+  clientId: string | null;
+  requestPayload?: unknown;
+  responsePayload?: unknown;
+  success: boolean;
+  httpStatus: number | null;
+  errorMessage: string | null;
+  durationMs: number;
+  requestedByUserName: string | null;
+  requestedByEmployeeCode: string | null;
+  requestedByEmployeeName: string | null;
+  createdAt: string;
+};
+
+type CreditBureauApiHitsResponse = {
+  summary: {
+    total: number;
+    successful: number;
+    failed: number;
+    averageDurationMs: number;
+  };
+  hits: CreditBureauApiHit[];
   pagination: {
     page: number;
     limit: number;
@@ -961,6 +1008,17 @@ export default function Home() {
   const [reportDownloadsToDate, setReportDownloadsToDate] = useState("");
   const [reportDownloadsError, setReportDownloadsError] = useState("");
   const [isReportDownloadsLoading, setIsReportDownloadsLoading] = useState(false);
+  const [apiLogsData, setApiLogsData] = useState<CreditBureauApiHitsResponse | null>(null);
+  const [apiLogsSearch, setApiLogsSearch] = useState("");
+  const [apiLogsBureauType, setApiLogsBureauType] = useState("");
+  const [apiLogsOperationType, setApiLogsOperationType] = useState("");
+  const [apiLogsStatus, setApiLogsStatus] = useState("");
+  const [apiLogsFromDate, setApiLogsFromDate] = useState("");
+  const [apiLogsToDate, setApiLogsToDate] = useState("");
+  const [apiLogsLimit, setApiLogsLimit] = useState("20");
+  const [apiLogsIncludePayload, setApiLogsIncludePayload] = useState(false);
+  const [apiLogsError, setApiLogsError] = useState("");
+  const [isApiLogsLoading, setIsApiLogsLoading] = useState(false);
   const [cibilUsersData, setCibilUsersData] = useState<UsersResponse | null>(null);
   const [cibilUsersSearch, setCibilUsersSearch] = useState("");
   const [cibilUsersFromDate, setCibilUsersFromDate] = useState("");
@@ -1165,6 +1223,10 @@ export default function Home() {
 
     if (view === "Report Downloads" && !reportDownloadsData) {
       loadReportDownloads();
+    }
+
+    if (view === "API Logs" && !apiLogsData) {
+      loadApiLogs();
     }
 
     if (view === "Download CIBIL" && !cibilUsersData) {
@@ -1426,6 +1488,61 @@ export default function Home() {
       setReportDownloadsError(error instanceof Error ? error.message : "Unable to load report downloads");
     } finally {
       setIsReportDownloadsLoading(false);
+    }
+  }
+
+  async function loadApiLogs(
+    page = 1,
+    filters: Partial<{
+      search: string;
+      bureauType: string;
+      operationType: string;
+      status: string;
+      from: string;
+      to: string;
+      limit: string;
+      includePayload: boolean;
+    }> = {}
+  ) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setApiLogsError("");
+      setIsApiLogsLoading(true);
+      const search = filters.search ?? apiLogsSearch;
+      const bureauType = filters.bureauType ?? apiLogsBureauType;
+      const operationType = filters.operationType ?? apiLogsOperationType;
+      const status = filters.status ?? apiLogsStatus;
+      const from = filters.from ?? apiLogsFromDate;
+      const to = filters.to ?? apiLogsToDate;
+      const limit = filters.limit ?? apiLogsLimit;
+      const includePayload = filters.includePayload ?? apiLogsIncludePayload;
+      const params = new URLSearchParams({ page: String(page), limit });
+
+      if (search) params.set("search", search);
+      if (bureauType) params.set("bureauType", bureauType);
+      if (operationType) params.set("operationType", operationType);
+      if (status) params.set("status", status);
+      if (from) params.set("from", from);
+      if (to) params.set("totime", to);
+      if (includePayload) params.set("includePayload", "true");
+
+      const response = await fetch(`${API_BASE_URL}/admin/credit-bureau-api-hits?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load API logs");
+      }
+
+      setApiLogsData(result.data);
+    } catch (error) {
+      setApiLogsError(error instanceof Error ? error.message : "Unable to load API logs");
+    } finally {
+      setIsApiLogsLoading(false);
     }
   }
 
@@ -3364,6 +3481,27 @@ export default function Home() {
     loadReportDownloads(1, "", "", "");
   }
 
+  function resetApiLogFilters() {
+    setApiLogsSearch("");
+    setApiLogsBureauType("");
+    setApiLogsOperationType("");
+    setApiLogsStatus("");
+    setApiLogsFromDate("");
+    setApiLogsToDate("");
+    setApiLogsLimit("20");
+    setApiLogsIncludePayload(false);
+    loadApiLogs(1, {
+      search: "",
+      bureauType: "",
+      operationType: "",
+      status: "",
+      from: "",
+      to: "",
+      limit: "20",
+      includePayload: false,
+    });
+  }
+
   function resetCibilUserFilters() {
     setCibilUsersSearch("");
     setCibilUsersFromDate("");
@@ -3679,6 +3817,12 @@ export default function Home() {
       loadReportDownloads();
     }
   }, [activeView, adminUser?.token, reportDownloadsData, isReportDownloadsLoading]);
+
+  useEffect(() => {
+    if (activeView === "API Logs" && adminUser?.token && !apiLogsData && !isApiLogsLoading) {
+      loadApiLogs();
+    }
+  }, [activeView, adminUser?.token, apiLogsData, isApiLogsLoading]);
 
   useEffect(() => {
     if (activeView === "Download CIBIL" && adminUser?.token && !cibilUsersData && !isCibilUsersLoading) {
@@ -4024,6 +4168,7 @@ export default function Home() {
       { label: "Notifications", value: dashboardCounts?.totalNotifications ?? 0, meta: `${dashboardCounts?.unreadNotifications ?? 0} unread`, icon: dashboardIcons.notifications, trend: "0%" },
       { label: "Employees", value: dashboardCounts?.employees?.total ?? 0, meta: `${dashboardCounts?.employees?.active ?? 0} active`, icon: dashboardIcons.employees, trend: "0%" },
       { label: "Roles", value: dashboardCounts?.roles?.total ?? 0, meta: `${dashboardCounts?.roles?.active ?? 0} active`, icon: dashboardIcons.roles, trend: "0%" },
+      { label: "API History", value: dashboardCounts?.apiHistoryCount ?? 0, meta: "Credit bureau requests", icon: dashboardIcons.apiLogs, trend: "0%" },
     ];
     const pieColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444", "#7c3aed"];
     const subscriptionColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444"];
@@ -4131,6 +4276,39 @@ export default function Home() {
       download.creditScore || "-",
       formatDate(download.reportFetchedAt),
       formatDate(download.downloadedAt),
+    ]) ?? [];
+    const apiLogColumns = [
+      "Bureau",
+      "Operation",
+      "Method",
+      "Endpoint",
+      "Mobile / PAN",
+      "Status",
+      "HTTP",
+      "Duration",
+      "Requested By",
+      "Created At",
+      ...(apiLogsIncludePayload ? ["Request Payload", "Response Payload"] : []),
+    ];
+    const apiLogRows = apiLogsData?.hits.map((hit) => [
+      hit.bureauType.toUpperCase(),
+      formatLabel(hit.operationType),
+      hit.httpMethod || "-",
+      hit.endpoint,
+      [hit.mobile, hit.pan].filter(Boolean).join(" / ") || "-",
+      hit.success ? "Success" : "Failed",
+      hit.httpStatus ?? "-",
+      `${hit.durationMs} ms`,
+      hit.requestedByEmployeeName
+        ? `${hit.requestedByEmployeeName}${hit.requestedByEmployeeCode ? ` (${hit.requestedByEmployeeCode})` : ""}`
+        : hit.requestedByUserName || "-",
+      formatDate(hit.createdAt),
+      ...(apiLogsIncludePayload
+        ? [
+          <pre className="api-log-payload">{JSON.stringify(hit.requestPayload ?? null, null, 2)}</pre>,
+          <pre className="api-log-payload">{JSON.stringify(hit.responsePayload ?? null, null, 2)}</pre>,
+        ]
+        : []),
     ]) ?? [];
     const manualReportDownloadColumns = ["Bureau", "Name", "Mobile", "PAN", "Credit Score", "PDF", "Downloaded By", "Downloaded At", "Action"];
     const manualReportDownloadRows = manualReportDownloadsData?.downloads.map((download) => [
@@ -5312,6 +5490,78 @@ export default function Home() {
                       : undefined
                   }
                   rows={contactRows}
+                />
+              </>
+            ) : activeView === "API Logs" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>API Logs</h2>
+                    <p>
+                      {apiLogsData
+                        ? `${apiLogsData.summary.successful} successful · ${apiLogsData.summary.failed} failed · ${apiLogsData.summary.averageDurationMs} ms average`
+                        : "Credit bureau API request history"}
+                    </p>
+                  </div>
+                  <span>{apiLogsData?.pagination.total ?? 0} requests</span>
+                </section>
+
+                <div className="mobile-toolbar-actions single">
+                  <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>Filter</button>
+                </div>
+
+                <section className={`table-toolbar api-logs-toolbar ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
+                  <input placeholder="Search logs..." value={apiLogsSearch} onChange={(event) => setApiLogsSearch(event.target.value)} />
+                  <select aria-label="Bureau type" value={apiLogsBureauType} onChange={(event) => setApiLogsBureauType(event.target.value)}>
+                    <option value="">All bureaus</option>
+                    <option value="experian">Experian</option>
+                    <option value="cibil">CIBIL</option>
+                    <option value="crif">CRIF</option>
+                  </select>
+                  <select aria-label="Operation type" value={apiLogsOperationType} onChange={(event) => setApiLogsOperationType(event.target.value)}>
+                    <option value="">All operations</option>
+                    <option value="score">Score</option>
+                    <option value="report_data">Report data</option>
+                    <option value="manual_report_download">Manual report download</option>
+                  </select>
+                  <select aria-label="Status" value={apiLogsStatus} onChange={(event) => setApiLogsStatus(event.target.value)}>
+                    <option value="">All statuses</option>
+                    <option value="success">Success</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                  <DateFilter label="Start date" value={apiLogsFromDate} onChange={setApiLogsFromDate} />
+                  <DateFilter label="End date" value={apiLogsToDate} onChange={setApiLogsToDate} />
+                  <select aria-label="Rows per page" value={apiLogsLimit} onChange={(event) => setApiLogsLimit(event.target.value)}>
+                    <option value="10">10 rows</option>
+                    <option value="20">20 rows</option>
+                    <option value="50">50 rows</option>
+                    <option value="100">100 rows</option>
+                  </select>
+                  <select
+                    aria-label="Payload visibility"
+                    value={apiLogsIncludePayload ? "true" : "false"}
+                    onChange={(event) => setApiLogsIncludePayload(event.target.value === "true")}
+                  >
+                    <option value="false">Hide payloads</option>
+                    <option value="true">Include payloads</option>
+                  </select>
+                  <button className="icon-button" title="Reset filters" type="button" onClick={resetApiLogFilters}>↻</button>
+                  <button disabled={isApiLogsLoading} type="button" onClick={() => loadApiLogs(1)}>Search</button>
+                </section>
+
+                {apiLogsError ? <p className="dashboard-error">{apiLogsError}</p> : null}
+
+                <CommonTable
+                  columns={apiLogColumns}
+                  emptyText={isApiLogsLoading ? "Loading API logs..." : "No API logs found"}
+                  isLoading={isApiLogsLoading}
+                  pagination={apiLogsData ? {
+                    page: apiLogsData.pagination.page,
+                    totalPages: apiLogsData.pagination.totalPages,
+                    onPrevious: () => loadApiLogs(apiLogsData.pagination.page - 1),
+                    onNext: () => loadApiLogs(apiLogsData.pagination.page + 1),
+                  } : undefined}
+                  rows={apiLogRows}
                 />
               </>
             ) : activeView === "Report Downloads" ? (

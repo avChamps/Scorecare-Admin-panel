@@ -1153,6 +1153,23 @@ select {
   grid-template-columns: minmax(220px, 1fr) 150px 150px 44px auto;
 }
 
+.api-logs-toolbar {
+  grid-template-columns: minmax(220px, 1fr) repeat(4, minmax(130px, 160px));
+}
+
+.api-log-payload {
+  background: #f6f8fc;
+  border-radius: 8px;
+  font-size: 11px;
+  margin: 0;
+  max-height: 220px;
+  max-width: 360px;
+  overflow: auto;
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .dashboard-filter-toolbar {
   grid-template-columns: 170px 170px 44px auto;
   justify-content: end;
