@@ -1093,6 +1093,15 @@ select {
   padding: 16px;
 }
 
+.report-download-toolbar {
+  grid-template-columns: minmax(220px, 1fr) 150px 150px 44px auto;
+}
+
+.dashboard-filter-toolbar {
+  grid-template-columns: 170px 170px 44px auto;
+  justify-content: end;
+}
+
 .mobile-toolbar-actions {
   display: none;
 }
@@ -2637,6 +2646,21 @@ select {
   border-color: #1769e0;
   color: #ffffff;
   transform: translateY(-1px);
+}
+
+.download-report-action {
+  padding: 0;
+  width: 32px;
+}
+
+.download-report-action .button-icon {
+  margin: 0;
+}
+
+.download-report-action .api-loader {
+  border-width: 2px;
+  height: 16px;
+  width: 16px;
 }
 
 

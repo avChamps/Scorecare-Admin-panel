@@ -105,6 +105,11 @@ const menuIcons: Record<string, ReactNode> = {
       <path d="m4 7 8 6 8-6" />
     </svg>
   ),
+  Reports: (
+    <svg viewBox="0 0 24 24">
+      <path d="M6 3h9l3 3v15H6zM14 3v4h4M9 16v-3M12 16V9M15 16v-5" />
+    </svg>
+  ),
 };
 const dashboardIcons: Record<string, ReactNode> = {
   users: menuIcons.Users,
@@ -215,7 +220,7 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL";
 
 type UserMenuAccess = {
   menuName: string;
@@ -239,6 +244,8 @@ const viewRoutes: Record<AppView, string> = {
   FAQs: "/faqs",
   Feedback: "/feedback",
   "Contact Us": "/contact-us",
+  "Report Downloads": "/reports/downloads",
+  "Download CIBIL": "/reports/download-cibil",
 };
 
 const routeViews: Record<string, AppView> = {
@@ -252,6 +259,8 @@ const routeViews: Record<string, AppView> = {
   "/plans-benefits": "Plans & Benefits",
   "/feedback": "Feedback",
   "/contact-us": "Contact Us",
+  "/reports/downloads": "Report Downloads",
+  "/reports/download-cibil": "Download CIBIL",
   "/users": "Users",
   "/employees": "Employees",
   "/roles": "Roles",
@@ -276,6 +285,8 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   FAQs: { menuName: "General", childMenuName: "FAQ" },
   Feedback: { menuName: "Feedback", childMenuName: null },
   "Contact Us": { menuName: "Contact Us", childMenuName: null },
+  "Report Downloads": { menuName: "Reports", childMenuName: "Downloads" },
+  "Download CIBIL": { menuName: "Reports", childMenuName: "Download CIBIL" },
 };
 
 type ActionIconType = "add" | "edit" | "delete" | "back";
@@ -587,6 +598,33 @@ type UsersResponse = {
   };
 };
 
+type CreditReportDownload = {
+  id: number;
+  creditReportId: number | null;
+  reportType: string;
+  userId: string;
+  fullName: string;
+  mobileNumber: string;
+  email: string;
+  panNumber: string | null;
+  provider: string | null;
+  clientId: string | null;
+  creditScore: string | null;
+  reportFetchedAt: string | null;
+  downloadedAt: string;
+  createdAt: string;
+};
+
+type CreditReportDownloadsResponse = {
+  downloads: CreditReportDownload[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 type EmployeeRow = {
   id?: number;
   publicId: string;
@@ -856,8 +894,11 @@ export default function Home() {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [userMenuAccess, setUserMenuAccess] = useState<UserMenuAccess[]>([]);
   const [dashboardCounts, setDashboardCounts] = useState<DashboardCounts | null>(null);
+  const [dashboardFromDate, setDashboardFromDate] = useState("");
+  const [dashboardToDate, setDashboardToDate] = useState("");
   const [error, setError] = useState("");
   const [dashboardError, setDashboardError] = useState("");
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSessionChecking, setIsSessionChecking] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -867,6 +908,7 @@ export default function Home() {
   const [isEmployeeManagementMenuOpen, setIsEmployeeManagementMenuOpen] = useState(false);
   const [isSubscriptionsMenuOpen, setIsSubscriptionsMenuOpen] = useState(false);
   const [isPlansBenefitsMenuOpen, setIsPlansBenefitsMenuOpen] = useState(false);
+  const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [activeView, setActiveView] = useState<AppView>("Dashboard");
   const [usersData, setUsersData] = useState<UsersResponse | null>(null);
@@ -876,6 +918,19 @@ export default function Home() {
   const [usersError, setUsersError] = useState("");
   const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [reportDownloadsData, setReportDownloadsData] = useState<CreditReportDownloadsResponse | null>(null);
+  const [reportDownloadsSearch, setReportDownloadsSearch] = useState("");
+  const [reportDownloadsFromDate, setReportDownloadsFromDate] = useState("");
+  const [reportDownloadsToDate, setReportDownloadsToDate] = useState("");
+  const [reportDownloadsError, setReportDownloadsError] = useState("");
+  const [isReportDownloadsLoading, setIsReportDownloadsLoading] = useState(false);
+  const [cibilUsersData, setCibilUsersData] = useState<UsersResponse | null>(null);
+  const [cibilUsersSearch, setCibilUsersSearch] = useState("");
+  const [cibilUsersFromDate, setCibilUsersFromDate] = useState("");
+  const [cibilUsersToDate, setCibilUsersToDate] = useState("");
+  const [cibilUsersError, setCibilUsersError] = useState("");
+  const [isCibilUsersLoading, setIsCibilUsersLoading] = useState(false);
+  const [downloadingCibilUserId, setDownloadingCibilUserId] = useState<string | null>(null);
   const [employeesData, setEmployeesData] = useState<EmployeesResponse | null>(null);
   const [employeesSearch, setEmployeesSearch] = useState("");
   const [employeesStatus, setEmployeesStatus] = useState("");
@@ -1049,6 +1104,14 @@ export default function Home() {
       loadUsers();
     }
 
+    if (view === "Report Downloads" && !reportDownloadsData) {
+      loadReportDownloads();
+    }
+
+    if (view === "Download CIBIL" && !cibilUsersData) {
+      loadCibilUsers();
+    }
+
     if (view === "Employees" && !employeesData) {
       loadEmployees();
       loadEmployeeRoles();
@@ -1147,10 +1210,17 @@ export default function Home() {
     return (Object.keys(viewRoutes) as AppView[]).find((view) => hasViewPermission(view, accessList)) || null;
   }
 
-  async function loadDashboardCounts(token: string) {
+  async function loadDashboardCounts(token: string, from = dashboardFromDate, to = dashboardToDate) {
     try {
       setDashboardError("");
-      const response = await fetch(`${API_BASE_URL}/admin/dashboard-counts`, {
+      setIsDashboardLoading(true);
+      const params = new URLSearchParams();
+
+      if (from) params.set("from", from);
+      if (to) params.set("totime", to);
+
+      const query = params.toString();
+      const response = await fetch(`${API_BASE_URL}/admin/dashboard-counts${query ? `?${query}` : ""}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await response.json();
@@ -1171,6 +1241,17 @@ export default function Home() {
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : "Unable to load dashboard");
       return false;
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  }
+
+  function resetDashboardFilters() {
+    setDashboardFromDate("");
+    setDashboardToDate("");
+
+    if (adminUser?.token) {
+      loadDashboardCounts(adminUser.token, "", "");
     }
   }
 
@@ -1245,6 +1326,115 @@ export default function Home() {
       setUsersError(error instanceof Error ? error.message : "Unable to load users");
     } finally {
       setIsUsersLoading(false);
+    }
+  }
+
+  async function loadReportDownloads(
+    page = 1,
+    search = reportDownloadsSearch,
+    from = reportDownloadsFromDate,
+    to = reportDownloadsToDate
+  ) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setReportDownloadsError("");
+      setIsReportDownloadsLoading(true);
+      const params = new URLSearchParams({ page: String(page), limit: "10" });
+
+      if (search) params.set("search", search);
+      if (from) params.set("from", `${from} 00:00:00`);
+      if (to) params.set("totime", `${to} 23:59:59`);
+
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-report-downloads?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load report downloads");
+      }
+
+      setReportDownloadsData(result.data);
+    } catch (error) {
+      setReportDownloadsError(error instanceof Error ? error.message : "Unable to load report downloads");
+    } finally {
+      setIsReportDownloadsLoading(false);
+    }
+  }
+
+  async function loadCibilUsers(
+    page = 1,
+    search = cibilUsersSearch,
+    from = cibilUsersFromDate,
+    to = cibilUsersToDate
+  ) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setCibilUsersError("");
+      setIsCibilUsersLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "10",
+        status: "active",
+      });
+
+      if (search) params.set("search", search);
+      if (from) params.set("from", from);
+      if (to) params.set("totime", to);
+
+      const response = await fetch(`${API_BASE_URL}/admin/users?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load users");
+      }
+
+      setCibilUsersData(result.data);
+    } catch (error) {
+      setCibilUsersError(error instanceof Error ? error.message : "Unable to load users");
+    } finally {
+      setIsCibilUsersLoading(false);
+    }
+  }
+
+  async function downloadUserCibilReport(user: UserRow) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setDownloadingCibilUserId(user.publicId);
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-report-download/${user.publicId}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.message || "Unable to download CIBIL report");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const disposition = response.headers.get("content-disposition") || "";
+      const fileName = disposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i)?.[1];
+
+      link.href = url;
+      link.download = fileName ? decodeURIComponent(fileName) : `${toFileName(user.fullName)}-cibil-report.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to download CIBIL report");
+    } finally {
+      setDownloadingCibilUserId(null);
     }
   }
 
@@ -2970,6 +3160,20 @@ export default function Home() {
     loadUsers(1, "");
   }
 
+  function resetReportDownloadFilters() {
+    setReportDownloadsSearch("");
+    setReportDownloadsFromDate("");
+    setReportDownloadsToDate("");
+    loadReportDownloads(1, "", "", "");
+  }
+
+  function resetCibilUserFilters() {
+    setCibilUsersSearch("");
+    setCibilUsersFromDate("");
+    setCibilUsersToDate("");
+    loadCibilUsers(1, "", "", "");
+  }
+
   function toggleNotificationUser(publicId: string) {
     setSelectedNotificationUserIds((ids) =>
       ids.includes(publicId) ? ids.filter((id) => id !== publicId) : [...ids, publicId]
@@ -3178,6 +3382,7 @@ export default function Home() {
       setIsEmployeeManagementMenuOpen(routeView === "Employees" || routeView === "Roles");
       setIsSubscriptionsMenuOpen(routeView === "Subscriptions");
       setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits");
+      setIsReportsMenuOpen(routeView === "Report Downloads" || routeView === "Download CIBIL");
 
       if (routeView === "Plans & Benefits") {
         setPlansBenefitsTab("repair");
@@ -3244,6 +3449,18 @@ export default function Home() {
       loadUsers();
     }
   }, [activeView, adminUser?.token, usersData, isUsersLoading]);
+
+  useEffect(() => {
+    if (activeView === "Report Downloads" && adminUser?.token && !reportDownloadsData && !isReportDownloadsLoading) {
+      loadReportDownloads();
+    }
+  }, [activeView, adminUser?.token, reportDownloadsData, isReportDownloadsLoading]);
+
+  useEffect(() => {
+    if (activeView === "Download CIBIL" && adminUser?.token && !cibilUsersData && !isCibilUsersLoading) {
+      loadCibilUsers();
+    }
+  }, [activeView, adminUser?.token, cibilUsersData, isCibilUsersLoading]);
 
   useEffect(() => {
     if (activeView === "Employees" && adminUser?.token && !employeesData && !isEmployeesLoading) {
@@ -3528,7 +3745,10 @@ export default function Home() {
 
   if (step === "admin") {
     const isAdminApiLoading =
+      isDashboardLoading ||
       isUsersLoading ||
+      isReportDownloadsLoading ||
+      isCibilUsersLoading ||
       isEmployeesLoading ||
       isEmployeeSaving ||
       isEmployeeRolesLoading ||
@@ -3632,6 +3852,41 @@ export default function Home() {
       user.totalMessages,
       user.loans.latestStatus || user.loans.total,
       user.status,
+    ]) ?? [];
+    const cibilUserColumns = ["Name", "Mobile", "Email", "PAN", "CIBIL Score", "Status", "Action"];
+    const cibilUserRows = cibilUsersData?.users.map((user) => [
+      user.fullName,
+      user.mobileNumber,
+      user.email,
+      user.panNumber || "-",
+      user.creditScore || "-",
+      user.status,
+      <button
+        aria-label={`Download CIBIL report for ${user.fullName}`}
+        className="table-action download-report-action"
+        disabled={downloadingCibilUserId === user.publicId}
+        title="Download CIBIL report"
+        type="button"
+        onClick={() => downloadUserCibilReport(user)}
+      >
+        {downloadingCibilUserId === user.publicId ? <span className="api-loader" /> : (
+          <svg className="button-icon" viewBox="0 0 24 24">
+            <path d="M12 3v12M7 10l5 5 5-5M5 20h14" />
+          </svg>
+        )}
+      </button>,
+    ]) ?? [];
+    const reportDownloadColumns = ["User", "Mobile", "Email", "PAN", "Report Type", "Provider", "CIBIL Score", "Fetched At", "Downloaded At"];
+    const reportDownloadRows = reportDownloadsData?.downloads.map((download) => [
+      download.fullName,
+      download.mobileNumber,
+      download.email,
+      download.panNumber || "-",
+      download.reportType,
+      download.provider || "-",
+      download.creditScore || "-",
+      formatDate(download.reportFetchedAt),
+      formatDate(download.downloadedAt),
     ]) ?? [];
     const employeeColumns = [
       "Code",
@@ -3849,9 +4104,9 @@ export default function Home() {
         <aside className={`sidebar ${isSidebarCollapsed ? "collapsed" : ""}`}>
           <div className="sidebar-brand">
             <img src="/scorecare-logo.PNG" alt="ScoreCare" />
-            <button className="sidebar-close" type="button" onClick={() => setIsSidebarCollapsed(true)}>
+            {/* <button className="sidebar-close" type="button" onClick={() => setIsSidebarCollapsed(true)}>
               ×
-            </button>
+            </button> */}
           </div>
           <nav>
             {menuItems.filter((item) => hasViewPermission(item as AppView)).map((item) => (
@@ -3946,6 +4201,21 @@ export default function Home() {
                               <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
                               Repair service
                             </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {hasViewPermission("Report Downloads") || hasViewPermission("Download CIBIL") ? (
+                      <div className={`sidebar-group ${activeView === "Report Downloads" || activeView === "Download CIBIL" ? "active" : ""}`}>
+                        <button className="sidebar-group-toggle" type="button" onClick={() => setIsReportsMenuOpen((current) => !current)}>
+                          <span className="menu-icon">{menuIcons.Reports}</span>
+                          Reports
+                          <span className="sidebar-chevron">{isReportsMenuOpen ? "⌄" : "›"}</span>
+                        </button>
+                        {isReportsMenuOpen ? (
+                          <div className="sidebar-submenu">
+                            {hasViewPermission("Report Downloads") ? <button className={activeView === "Report Downloads" ? "active" : ""} type="button" onClick={() => openAdminView("Report Downloads")}><span className="menu-icon">{menuIcons.Reports}</span>Downloads</button> : null}
+                            {hasViewPermission("Download CIBIL") ? <button className={activeView === "Download CIBIL" ? "active" : ""} type="button" onClick={() => openAdminView("Download CIBIL")}><span className="menu-icon">{menuIcons.Reports}</span>Download CIBIL</button> : null}
                           </div>
                         ) : null}
                       </div>
@@ -4758,6 +5028,94 @@ export default function Home() {
                   rows={contactRows}
                 />
               </>
+            ) : activeView === "Report Downloads" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Report Downloads</h2>
+                    <p>CIBIL report download history</p>
+                  </div>
+                  <span>{reportDownloadsData?.pagination.total ?? 0} downloads</span>
+                </section>
+
+                <div className="mobile-toolbar-actions single">
+                  <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>Filter</button>
+                </div>
+
+                <section className={`table-toolbar report-download-toolbar ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
+                  <input placeholder="Search downloads..." value={reportDownloadsSearch} onChange={(event) => setReportDownloadsSearch(event.target.value)} />
+                  <DateFilter label="Start date" value={reportDownloadsFromDate} onChange={setReportDownloadsFromDate} />
+                  <DateFilter label="End date" value={reportDownloadsToDate} onChange={setReportDownloadsToDate} />
+                  <button className="icon-button" title="Reset filters" type="button" onClick={resetReportDownloadFilters}>↻</button>
+                  <button type="button" onClick={() => loadReportDownloads(1)}>Search</button>
+                </section>
+
+                {reportDownloadsError ? <p className="dashboard-error">{reportDownloadsError}</p> : null}
+
+                <CommonTable
+                  columns={reportDownloadColumns}
+                  emptyText={isReportDownloadsLoading ? "Loading downloads..." : "No report downloads found"}
+                  isLoading={isReportDownloadsLoading}
+                  pagination={reportDownloadsData ? {
+                    page: reportDownloadsData.pagination.page,
+                    totalPages: reportDownloadsData.pagination.totalPages,
+                    onPrevious: () => loadReportDownloads(reportDownloadsData.pagination.page - 1),
+                    onNext: () => loadReportDownloads(reportDownloadsData.pagination.page + 1),
+                  } : undefined}
+                  rows={reportDownloadRows}
+                />
+              </>
+            ) : activeView === "Download CIBIL" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Download CIBIL</h2>
+                    <p>Download saved CIBIL reports for active users</p>
+                  </div>
+                  <span>{cibilUsersData?.pagination.total ?? 0} users</span>
+                </section>
+
+                <div className="mobile-toolbar-actions single">
+                  <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>
+                    Filter
+                  </button>
+                </div>
+
+                <section className={`table-toolbar report-download-toolbar ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
+                  <input
+                    placeholder="Search active users..."
+                    value={cibilUsersSearch}
+                    onChange={(event) => setCibilUsersSearch(event.target.value)}
+                  />
+                  <DateFilter label="Start date" value={cibilUsersFromDate} onChange={setCibilUsersFromDate} />
+                  <DateFilter label="End date" value={cibilUsersToDate} onChange={setCibilUsersToDate} />
+                  <button className="icon-button" title="Reset filters" type="button" onClick={resetCibilUserFilters}>
+                    ↻
+                  </button>
+                  <button type="button" onClick={() => loadCibilUsers(1)}>
+                    Search
+                  </button>
+                </section>
+
+                {cibilUsersError ? <p className="dashboard-error">{cibilUsersError}</p> : null}
+
+                <CommonTable
+                  columns={cibilUserColumns}
+                  emptyText={isCibilUsersLoading ? "Loading users..." : "No active users found"}
+                  isLoading={isCibilUsersLoading}
+                  pagination={
+                    cibilUsersData
+                      ? {
+                        page: cibilUsersData.pagination.page,
+                        totalPages: cibilUsersData.pagination.totalPages,
+                        onPrevious: () => loadCibilUsers(cibilUsersData.pagination.page - 1),
+                        onNext: () => loadCibilUsers(cibilUsersData.pagination.page + 1),
+                      }
+                      : undefined
+                  }
+                  rows={cibilUserRows}
+                />
+              </>
             ) : activeView === "Users" ? (
               <>
                 <section className="welcome-panel">
@@ -5199,6 +5557,13 @@ export default function Home() {
                   </div>
                   <strong>₹{totalRevenue.toLocaleString("en-IN")}</strong>
                 </div>
+
+                <section className="table-toolbar dashboard-filter-toolbar">
+                  <DateFilter label="Start date" value={dashboardFromDate} onChange={setDashboardFromDate} />
+                  <DateFilter label="End date" value={dashboardToDate} onChange={setDashboardToDate} />
+                  <button className="icon-button" title="Reset filters" type="button" onClick={resetDashboardFilters}>↻</button>
+                  <button disabled={!adminUser?.token} type="button" onClick={() => adminUser?.token && loadDashboardCounts(adminUser.token)}>Apply</button>
+                </section>
 
                 {dashboardError ? <p className="dashboard-error">{dashboardError}</p> : null}
 
