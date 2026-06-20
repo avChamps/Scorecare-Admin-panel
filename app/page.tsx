@@ -3419,6 +3419,18 @@ export default function Home() {
   }, [activeView, adminUser?.token, hasLoadedGeneral, isGeneralLoading]);
 
   useEffect(() => {
+    if (activeView === "Homepage Themes" && adminUser?.token && !hasLoadedHomepageThemes && !isHomepageThemesLoading) {
+      loadHomepageThemes();
+    }
+  }, [activeView, adminUser?.token, hasLoadedHomepageThemes, isHomepageThemesLoading]);
+
+  useEffect(() => {
+    if (activeView === "Legal Center" && adminUser?.token && !hasLoadedLegalContent && !isLegalContentLoading) {
+      loadLegalContent();
+    }
+  }, [activeView, adminUser?.token, hasLoadedLegalContent, isLegalContentLoading]);
+
+  useEffect(() => {
     if (activeView === "FAQs" && adminUser?.token && !hasLoadedFaqs && !isFaqsLoading) {
       loadFaqs();
     }
@@ -3438,10 +3450,10 @@ export default function Home() {
   }, [activeView, adminUser?.token, hasLoadedAdminPlans, isAdminPlansLoading]);
 
   useEffect(() => {
-    if (activeView === "Plans & Benefits" && plansBenefitsTab === "repair" && !hasLoadedCibilRepair && !isCibilRepairLoading) {
+    if (activeView === "Plans & Benefits" && adminUser?.token && plansBenefitsTab === "repair" && !hasLoadedCibilRepair && !isCibilRepairLoading) {
       loadCibilRepairContent();
     }
-  }, [activeView, plansBenefitsTab, hasLoadedCibilRepair, isCibilRepairLoading]);
+  }, [activeView, adminUser?.token, plansBenefitsTab, hasLoadedCibilRepair, isCibilRepairLoading]);
 
   useEffect(() => {
     if (!shouldScrollToNewCibilRepairTimeline.current) {
@@ -3495,6 +3507,18 @@ export default function Home() {
       loadContactRequests();
     }
   }, [activeView, adminUser?.token, contactRequestsData, isContactLoading]);
+
+  useEffect(() => {
+    if (activeView === "Loans" && adminUser?.token && !loansData && !isLoansLoading) {
+      loadLoans();
+    }
+  }, [activeView, adminUser?.token, loansData, isLoansLoading]);
+
+  useEffect(() => {
+    if (activeView === "Chats" && adminUser?.token && !chatsData && !isChatsLoading) {
+      loadChats();
+    }
+  }, [activeView, adminUser?.token, chatsData, isChatsLoading]);
 
   useEffect(() => {
     if (step !== "otp") {
@@ -5147,7 +5171,7 @@ export default function Home() {
                     Filter
                   </button>
                   {canExportUsers ? (
-                    <button disabled={isExporting} type="button" onClick={exportUsers}>
+                    <button className="export-button" disabled={isExporting} type="button" onClick={exportUsers}>
                       {isExporting ? "Exporting..." : "Export"}
                     </button>
                   ) : null}
@@ -5168,7 +5192,7 @@ export default function Home() {
                     Search
                   </button>
                   {canExportUsers ? (
-                    <button disabled={isExporting} type="button" onClick={exportUsers}>
+                    <button className="export-button" disabled={isExporting} type="button" onClick={exportUsers}>
                       {isExporting ? "Exporting..." : "Export"}
                     </button>
                   ) : null}
@@ -5218,7 +5242,7 @@ export default function Home() {
                     Search
                   </button>
                   {canCreateEmployees ? (
-                    <button type="button" onClick={() => openEmployeeModal()}>
+                    <button className="add-button" type="button" onClick={() => openEmployeeModal()}>
                       <ActionIcon type="add" />
                       Add Employee
                     </button>
@@ -5368,7 +5392,7 @@ export default function Home() {
                         Search
                       </button>
                       {canCreateRoles ? (
-                        <button type="button" onClick={() => openEmployeeRoleModal()}>
+                        <button className="add-button" type="button" onClick={() => openEmployeeRoleModal()}>
                           Add Role
                         </button>
                       ) : null}
@@ -5411,7 +5435,7 @@ export default function Home() {
                     Filter
                   </button>
                   {canExportUsers ? (
-                    <button disabled={isExporting} type="button" onClick={exportUsers}>
+                    <button className="export-button" disabled={isExporting} type="button" onClick={exportUsers}>
                       {isExporting ? "Exporting..." : "Export"}
                     </button>
                   ) : null}
@@ -5432,7 +5456,7 @@ export default function Home() {
                     Search
                   </button>
                   {canExportUsers ? (
-                    <button disabled={isExporting} type="button" onClick={exportUsers}>
+                    <button className="export-button" disabled={isExporting} type="button" onClick={exportUsers}>
                       {isExporting ? "Exporting..." : "Export"}
                     </button>
                   ) : null}
@@ -5462,7 +5486,7 @@ export default function Home() {
                     Filter
                   </button>
                   {canExportLoans ? (
-                    <button disabled={isLoansExporting} type="button" onClick={exportLoans}>
+                    <button className="export-button" disabled={isLoansExporting} type="button" onClick={exportLoans}>
                       {isLoansExporting ? "Exporting..." : "Export"}
                     </button>
                   ) : null}
@@ -5489,7 +5513,7 @@ export default function Home() {
                     Search
                   </button>
                   {canExportLoans ? (
-                    <button disabled={isLoansExporting} type="button" onClick={exportLoans}>
+                    <button className="export-button" disabled={isLoansExporting} type="button" onClick={exportLoans}>
                       {isLoansExporting ? "Exporting..." : "Export"}
                     </button>
                   ) : null}

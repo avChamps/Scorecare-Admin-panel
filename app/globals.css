@@ -2394,6 +2394,32 @@ select {
   transform: translateY(-1px);
 }
 
+.table-toolbar .export-button,
+.mobile-toolbar-actions .export-button {
+  background: #0f9f75;
+  border-color: #0f9f75;
+  box-shadow: 0 8px 18px rgba(15, 159, 117, 0.18);
+  color: #ffffff;
+}
+
+.table-toolbar .export-button:hover,
+.mobile-toolbar-actions .export-button:hover {
+  background: #0a8b65;
+  border-color: #0a8b65;
+}
+
+.table-toolbar .add-button {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.2);
+  color: #ffffff;
+}
+
+.table-toolbar .add-button:hover {
+  background: #d97706;
+  border-color: #d97706;
+}
+
 .table-toolbar .icon-button {
   background: #ffffff;
   border: 1px solid #d7e2f0;
