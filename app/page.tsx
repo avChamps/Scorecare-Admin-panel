@@ -844,6 +844,7 @@ type GeneralSettings = {
   mobileNumber: string;
   whatsappNumber: string;
   selectedLanguage: string;
+  address: string;
 };
 
 type HomepageTheme = {
@@ -987,6 +988,7 @@ export default function Home() {
     mobileNumber: "",
     whatsappNumber: "",
     selectedLanguage: "",
+    address: "",
   });
   const [generalError, setGeneralError] = useState("");
   const [isGeneralLoading, setIsGeneralLoading] = useState(false);
@@ -1965,6 +1967,7 @@ export default function Home() {
         mobileNumber: result.data?.mobileNumber || "",
         whatsappNumber: result.data?.whatsappNumber || "",
         selectedLanguage: result.data?.selectedLanguage || "",
+        address: result.data?.address || "",
       });
       setHasLoadedGeneral(true);
     } catch (error) {
@@ -2139,6 +2142,7 @@ export default function Home() {
         mobileNumber: result.data?.mobileNumber || generalSettings.mobileNumber,
         whatsappNumber: result.data?.whatsappNumber || generalSettings.whatsappNumber,
         selectedLanguage: result.data?.selectedLanguage || generalSettings.selectedLanguage,
+        address: result.data?.address ?? generalSettings.address,
       });
     } catch (error) {
       setGeneralError(error instanceof Error ? error.message : "Unable to update general settings");
@@ -4346,6 +4350,14 @@ export default function Home() {
                       maxLength={10}
                       value={generalSettings.whatsappNumber}
                       onChange={(event) => setGeneralSettings((settings) => ({ ...settings, whatsappNumber: event.target.value.replace(/\D/g, "") }))}
+                    />
+                  </label>
+                  <label>
+                    Address
+                    <textarea
+                      rows={4}
+                      value={generalSettings.address}
+                      onChange={(event) => setGeneralSettings((settings) => ({ ...settings, address: event.target.value }))}
                     />
                   </label>
                   {/* <label>
