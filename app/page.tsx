@@ -155,7 +155,7 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us";
 
 const viewRoutes: Record<AppView, string> = {
   Dashboard: "/dashboard",
@@ -165,6 +165,7 @@ const viewRoutes: Record<AppView, string> = {
   Notifications: "/notifications",
   "Plans & Benefits": "/plans-benefits",
   Users: "/users",
+  Employees: "/employees",
   Subscriptions: "/subscriptions",
   Loans: "/loans",
   Chats: "/chat",
@@ -185,6 +186,7 @@ const routeViews: Record<string, AppView> = {
   "/feedback": "Feedback",
   "/contact-us": "Contact Us",
   "/users": "Users",
+  "/employees": "Employees",
   "/subscriptions": "Subscriptions",
   "/loans": "Loans",
   "/chat": "Chats",
@@ -491,6 +493,43 @@ type UsersResponse = {
   };
 };
 
+type EmployeeRow = {
+  id?: number;
+  publicId: string;
+  employeeCode: string;
+  fullName: string;
+  mobileNumber: string;
+  email: string;
+  role: string;
+  department: string;
+  designation: string;
+  status: string;
+  joinedAt: string | null;
+  createdAt?: string;
+};
+
+type EmployeesResponse = {
+  employees: EmployeeRow[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+type EmployeeForm = {
+  employeeCode: string;
+  fullName: string;
+  mobileNumber: string;
+  email: string;
+  role: string;
+  department: string;
+  designation: string;
+  status: string;
+  joinedAt: string;
+};
+
 type LoanRow = {
   id: number;
   user: {
@@ -696,6 +735,7 @@ export default function Home() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isGeneralMenuOpen, setIsGeneralMenuOpen] = useState(false);
   const [isUserManagementMenuOpen, setIsUserManagementMenuOpen] = useState(false);
+  const [isEmployeeManagementMenuOpen, setIsEmployeeManagementMenuOpen] = useState(false);
   const [isSubscriptionsMenuOpen, setIsSubscriptionsMenuOpen] = useState(false);
   const [isPlansBenefitsMenuOpen, setIsPlansBenefitsMenuOpen] = useState(false);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
@@ -707,6 +747,26 @@ export default function Home() {
   const [usersError, setUsersError] = useState("");
   const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [employeesData, setEmployeesData] = useState<EmployeesResponse | null>(null);
+  const [employeesSearch, setEmployeesSearch] = useState("");
+  const [employeesStatus, setEmployeesStatus] = useState("");
+  const [employeesError, setEmployeesError] = useState("");
+  const [isEmployeesLoading, setIsEmployeesLoading] = useState(false);
+  const [isEmployeeSaving, setIsEmployeeSaving] = useState(false);
+  const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [deletingEmployee, setDeletingEmployee] = useState<EmployeeRow | null>(null);
+  const [employeeForm, setEmployeeForm] = useState<EmployeeForm>({
+    employeeCode: "",
+    fullName: "",
+    mobileNumber: "",
+    email: "",
+    role: "",
+    department: "",
+    designation: "",
+    status: "active",
+    joinedAt: "",
+  });
   const [selectedSubscriptionUser, setSelectedSubscriptionUser] = useState<UserRow | null>(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
@@ -764,6 +824,7 @@ export default function Home() {
   const [notificationImageUrl, setNotificationImageUrl] = useState("");
   const [notificationScreen, setNotificationScreen] = useState("home");
   const [notificationsTab, setNotificationsTab] = useState<"notifications" | "users">("notifications");
+  const [notificationsSearch, setNotificationsSearch] = useState("");
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [notificationModalScope, setNotificationModalScope] = useState<"all" | "users">("all");
   const [notificationsData, setNotificationsData] = useState<AdminNotificationsResponse | null>(null);
@@ -842,6 +903,10 @@ export default function Home() {
 
     if ((view === "Users" || view === "Subscriptions") && !usersData) {
       loadUsers();
+    }
+
+    if (view === "Employees" && !employeesData) {
+      loadEmployees();
     }
 
     if (view === "Loans" && !loansData) {
@@ -959,6 +1024,44 @@ export default function Home() {
     }
   }
 
+  async function loadEmployees(page = 1, search = employeesSearch, status = employeesStatus) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setEmployeesError("");
+      setIsEmployeesLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "20",
+        search,
+        status,
+      });
+      const response = await fetch(`${API_BASE_URL}/admin/employees?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load employees");
+      }
+
+      setEmployeesData(result.data);
+    } catch (error) {
+      setEmployeesError(error instanceof Error ? error.message : "Unable to load employees");
+    } finally {
+      setIsEmployeesLoading(false);
+    }
+  }
+
   async function loadFeedback(page = 1, search = feedbackSearch, from = feedbackFromDate, to = feedbackToDate) {
     if (!adminUser?.token) {
       return;
@@ -1048,6 +1151,115 @@ export default function Home() {
     }
   }
 
+  function resetEmployeeForm() {
+    setEmployeeForm({
+      employeeCode: "",
+      fullName: "",
+      mobileNumber: "",
+      email: "",
+      role: "",
+      department: "",
+      designation: "",
+      status: "active",
+      joinedAt: "",
+    });
+    setEditingEmployeeId(null);
+  }
+
+  function openEmployeeModal(employee?: EmployeeRow) {
+    if (employee) {
+      setEditingEmployeeId(employee.publicId);
+      setEmployeeForm({
+        employeeCode: employee.employeeCode || "",
+        fullName: employee.fullName || "",
+        mobileNumber: employee.mobileNumber || "",
+        email: employee.email || "",
+        role: employee.role || "",
+        department: employee.department || "",
+        designation: employee.designation || "",
+        status: employee.status || "active",
+        joinedAt: employee.joinedAt ? employee.joinedAt.slice(0, 10) : "",
+      });
+    } else {
+      resetEmployeeForm();
+    }
+
+    setIsEmployeeModalOpen(true);
+  }
+
+  async function saveEmployee(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setEmployeesError("");
+      setIsEmployeeSaving(true);
+      const response = await fetch(
+        editingEmployeeId ? `${API_BASE_URL}/admin/employees/${editingEmployeeId}` : `${API_BASE_URL}/admin/employees`,
+        {
+          method: editingEmployeeId ? "PATCH" : "POST",
+          headers: {
+            Authorization: `Bearer ${adminUser.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(employeeForm),
+        }
+      );
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to save employee");
+      }
+
+      showToast("success", editingEmployeeId ? "Employee updated successfully" : "Employee added successfully");
+      setIsEmployeeModalOpen(false);
+      resetEmployeeForm();
+      await loadEmployees(employeesData?.pagination.page || 1);
+    } catch (error) {
+      setEmployeesError(error instanceof Error ? error.message : "Unable to save employee");
+    } finally {
+      setIsEmployeeSaving(false);
+    }
+  }
+
+  async function deleteEmployee() {
+    if (!adminUser?.token || !deletingEmployee?.publicId) {
+      return;
+    }
+
+    try {
+      setEmployeesError("");
+      setIsEmployeeSaving(true);
+      const response = await fetch(`${API_BASE_URL}/admin/employees/${deletingEmployee.publicId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to delete employee");
+      }
+
+      showToast("success", "Employee deleted successfully");
+      setDeletingEmployee(null);
+      await loadEmployees(employeesData?.pagination.page || 1);
+    } catch (error) {
+      setEmployeesError(error instanceof Error ? error.message : "Unable to delete employee");
+    } finally {
+      setIsEmployeeSaving(false);
+    }
+  }
+
   async function loadGeneralSettings() {
     if (!adminUser?.token) {
       return;
@@ -1124,7 +1336,7 @@ export default function Home() {
     }
   }
 
-  async function loadAdminNotifications(page = 1) {
+  async function loadAdminNotifications(page = 1, search = notificationsSearch) {
     if (!adminUser?.token) {
       return;
     }
@@ -1134,7 +1346,7 @@ export default function Home() {
       const params = new URLSearchParams({
         page: String(page),
         limit: "20",
-        search: "",
+        search,
         from: "",
         totime: "",
       });
@@ -2289,6 +2501,17 @@ export default function Home() {
     );
   }
 
+  function resetNotificationUsers() {
+    setNotificationUserSearch("");
+    setSelectedNotificationUserIds([]);
+    loadNotificationUsers(1, "");
+  }
+
+  function resetNotificationsList() {
+    setNotificationsSearch("");
+    loadAdminNotifications(1, "");
+  }
+
   function openNotificationModal(scope: "all" | "users", userPublicId?: string) {
     if (scope === "users" && userPublicId) {
       setSelectedNotificationUserIds([userPublicId]);
@@ -2468,6 +2691,7 @@ export default function Home() {
 
       setIsGeneralMenuOpen(["General", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].includes(routeView));
       setIsUserManagementMenuOpen(routeView === "Users");
+      setIsEmployeeManagementMenuOpen(routeView === "Employees");
       setIsSubscriptionsMenuOpen(routeView === "Subscriptions");
       setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits");
 
@@ -2536,6 +2760,12 @@ export default function Home() {
       loadUsers();
     }
   }, [activeView, adminUser?.token, usersData, isUsersLoading]);
+
+  useEffect(() => {
+    if (activeView === "Employees" && adminUser?.token && !employeesData && !isEmployeesLoading) {
+      loadEmployees();
+    }
+  }, [activeView, adminUser?.token, employeesData, isEmployeesLoading]);
 
   useEffect(() => {
     if (activeView === "Feedback" && adminUser?.token && !feedbackData && !isFeedbackLoading) {
@@ -2782,6 +3012,8 @@ export default function Home() {
   if (step === "admin") {
     const isAdminApiLoading =
       isUsersLoading ||
+      isEmployeesLoading ||
+      isEmployeeSaving ||
       isPlansLoading ||
       isLoansLoading ||
       isGeneralLoading ||
@@ -2831,6 +3063,28 @@ export default function Home() {
       user.totalMessages,
       user.loans.latestStatus || user.loans.total,
       user.status,
+    ]) ?? [];
+    const employeeColumns = ["Code", "Name", "Mobile", "Email", "Role", "Department", "Designation", "Status", "Joined At", "Action"];
+    const employeeRows = employeesData?.employees.map((employee) => [
+      employee.employeeCode,
+      employee.fullName,
+      employee.mobileNumber,
+      employee.email,
+      employee.role,
+      employee.department,
+      employee.designation,
+      employee.status,
+      formatDate(employee.joinedAt),
+      <div className="table-actions">
+        <button className="table-action" type="button" onClick={() => openEmployeeModal(employee)}>
+          <ActionIcon type="edit" />
+          Edit
+        </button>
+        <button className="table-action danger-action" type="button" onClick={() => setDeletingEmployee(employee)}>
+          <ActionIcon type="delete" />
+          Delete
+        </button>
+      </div>,
     ]) ?? [];
     const subscriptionColumns = ["Name", "Mobile", "Email", "Plan", "Started At", "Due At", "Updated By", "Status", "Action"];
     const subscriptionRows = usersData?.users.map((user) => [
@@ -3007,6 +3261,21 @@ export default function Home() {
                           <button className={activeView === "Users" ? "active" : ""} type="button" onClick={() => openAdminView("Users")}>
                             <span className="menu-icon">{menuIcons.Users}</span>
                             Users
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className={`sidebar-group ${activeView === "Employees" ? "active" : ""}`}>
+                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsEmployeeManagementMenuOpen((current) => !current)}>
+                        <span className="menu-icon">{menuIcons.Users}</span>
+                        Employee management
+                        <span className="sidebar-chevron">{isEmployeeManagementMenuOpen ? "⌄" : "›"}</span>
+                      </button>
+                      {isEmployeeManagementMenuOpen ? (
+                        <div className="sidebar-submenu">
+                          <button className={activeView === "Employees" ? "active" : ""} type="button" onClick={() => openAdminView("Employees")}>
+                            <span className="menu-icon">{menuIcons.Users}</span>
+                            Employees
                           </button>
                         </div>
                       ) : null}
@@ -3291,11 +3560,22 @@ export default function Home() {
 
                 {notificationsTab === "notifications" ? (
                   <>
-                    <div className="plans-toolbar">
-                      <button type="button" onClick={() => openNotificationModal("all")}>
-                        Send to all users
+                    <section className="table-toolbar notification-users-toolbar">
+                      <input
+                        placeholder="Search notifications..."
+                        value={notificationsSearch}
+                        onChange={(event) => setNotificationsSearch(event.target.value)}
+                      />
+                      <button className="icon-button" title="Reset notifications" type="button" onClick={resetNotificationsList}>
+                        ↻
                       </button>
-                    </div>
+                      <button type="button" onClick={() => loadAdminNotifications(1)}>
+                        Search
+                      </button>
+                      <button type="button" onClick={() => openNotificationModal("all")}>
+                        Send All
+                      </button>
+                    </section>
 
                     <CommonTable
                       columns={notificationColumns}
@@ -3315,12 +3595,15 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <section className="table-toolbar feedback-toolbar">
+                    <section className="table-toolbar notification-users-toolbar">
                       <input
                         placeholder="Search users..."
                         value={notificationUserSearch}
                         onChange={(event) => setNotificationUserSearch(event.target.value)}
                       />
+                      <button className="icon-button" title="Reset selected users" type="button" onClick={resetNotificationUsers}>
+                        ↻
+                      </button>
                       <button type="button" onClick={() => loadNotificationUsers(1)}>
                         Search
                       </button>
@@ -3858,6 +4141,54 @@ export default function Home() {
                   rows={usersRows}
                 />
               </>
+            ) : activeView === "Employees" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Employees</h2>
+                    <p>Manage employee records</p>
+                  </div>
+                  <span>{employeesData?.pagination.total ?? 0} employees</span>
+                </section>
+
+                <section className="table-toolbar employee-toolbar">
+                  <input
+                    placeholder="Search employees..."
+                    value={employeesSearch}
+                    onChange={(event) => setEmployeesSearch(event.target.value)}
+                  />
+                  <select value={employeesStatus} onChange={(event) => setEmployeesStatus(event.target.value)}>
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <button type="button" onClick={() => loadEmployees(1)}>
+                    Search
+                  </button>
+                  <button type="button" onClick={() => openEmployeeModal()}>
+                    Add Employee
+                  </button>
+                </section>
+
+                {employeesError ? <p className="dashboard-error">{employeesError}</p> : null}
+
+                <CommonTable
+                  columns={employeeColumns}
+                  emptyText={isEmployeesLoading ? "Loading employees..." : "No employees found"}
+                  isLoading={isEmployeesLoading}
+                  pagination={
+                    employeesData
+                      ? {
+                        page: employeesData.pagination.page,
+                        totalPages: employeesData.pagination.totalPages,
+                        onPrevious: () => loadEmployees(employeesData.pagination.page - 1),
+                        onNext: () => loadEmployees(employeesData.pagination.page + 1),
+                      }
+                      : undefined
+                  }
+                  rows={employeeRows}
+                />
+              </>
             ) : activeView === "Subscriptions" ? (
               <>
                 <section className="welcome-panel">
@@ -4297,6 +4628,88 @@ export default function Home() {
                   </button>
                 </footer>
               </form>
+            </section>
+          </div>
+        ) : null}
+        {isEmployeeModalOpen ? (
+          <div className="modal-backdrop">
+            <section className="plan-modal admin-plan-modal">
+              <header>
+                <div>
+                  <h3>{editingEmployeeId ? "Edit Employee" : "Add Employee"}</h3>
+                  <p>Employee Management</p>
+                </div>
+                <button type="button" onClick={() => setIsEmployeeModalOpen(false)}>
+                  ×
+                </button>
+              </header>
+
+              <form className="admin-plan-form modal-plan-form" onSubmit={saveEmployee}>
+                <div className="admin-plan-grid">
+                  <label>
+                    Employee Code
+                    <input required value={employeeForm.employeeCode} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, employeeCode: event.target.value }))} />
+                  </label>
+                  <label>
+                    Full Name
+                    <input required value={employeeForm.fullName} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, fullName: event.target.value }))} />
+                  </label>
+                  <label>
+                    Mobile Number
+                    <input required maxLength={10} value={employeeForm.mobileNumber} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, mobileNumber: event.target.value.replace(/\D/g, "") }))} />
+                  </label>
+                  <label>
+                    Email
+                    <input required type="email" value={employeeForm.email} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, email: event.target.value }))} />
+                  </label>
+                  <label>
+                    Role
+                    <input required value={employeeForm.role} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, role: event.target.value }))} />
+                  </label>
+                  <label>
+                    Department
+                    <input required value={employeeForm.department} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, department: event.target.value }))} />
+                  </label>
+                  <label>
+                    Designation
+                    <input required value={employeeForm.designation} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, designation: event.target.value }))} />
+                  </label>
+                  <label>
+                    Status
+                    <select value={employeeForm.status} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, status: event.target.value }))}>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </label>
+                  <label>
+                    Joined At
+                    <input required type="date" value={employeeForm.joinedAt} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, joinedAt: event.target.value }))} />
+                  </label>
+                </div>
+                <footer className="modal-actions">
+                  <button type="button" onClick={() => setIsEmployeeModalOpen(false)}>
+                    Cancel
+                  </button>
+                  <button disabled={isEmployeeSaving} type="submit">
+                    {isEmployeeSaving ? "Saving..." : editingEmployeeId ? "Update" : "Add"}
+                  </button>
+                </footer>
+              </form>
+            </section>
+          </div>
+        ) : null}
+        {deletingEmployee ? (
+          <div className="modal-backdrop">
+            <section className="plan-modal confirm-delete-modal">
+              <p>Are you sure want to delete?</p>
+              <footer className="modal-actions">
+                <button disabled={isEmployeeSaving} type="button" onClick={() => setDeletingEmployee(null)}>
+                  Cancel
+                </button>
+                <button className="danger-action" disabled={isEmployeeSaving} type="button" onClick={deleteEmployee}>
+                  {isEmployeeSaving ? "Deleting..." : "Delete"}
+                </button>
+              </footer>
             </section>
           </div>
         ) : null}

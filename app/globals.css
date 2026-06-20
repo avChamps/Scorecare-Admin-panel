@@ -1054,8 +1054,16 @@ select {
   grid-template-columns: minmax(220px, 1fr) 44px auto;
 }
 
+.employee-toolbar {
+  grid-template-columns: minmax(220px, 1fr) 170px auto auto;
+}
+
 .feedback-toolbar {
   grid-template-columns: minmax(220px, 1fr) 170px 170px 44px auto;
+}
+
+.notification-users-toolbar {
+  grid-template-columns: minmax(220px, 1fr) 44px 170px auto;
 }
 
 .general-form {
@@ -1079,6 +1087,7 @@ select {
 .faqs-form textarea,
 .homepage-theme-form input,
 .admin-plan-form input,
+.admin-plan-form select,
 .admin-plan-form textarea {
   box-sizing: border-box;
   max-width: 100%;
@@ -1099,6 +1108,10 @@ select {
   height: 44px;
 }
 
+.admin-plan-form select {
+  height: 44px;
+}
+
 .faqs-form textarea,
 .general-form textarea,
 .admin-plan-form textarea {
@@ -1113,6 +1126,7 @@ select {
 .faqs-form textarea:focus,
 .homepage-theme-form input:focus,
 .admin-plan-form input:focus,
+.admin-plan-form select:focus,
 .admin-plan-form textarea:focus {
   border-color: #6975df;
   box-shadow: 0 0 0 4px rgba(105, 117, 223, 0.12);
