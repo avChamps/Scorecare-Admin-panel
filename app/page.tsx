@@ -4335,7 +4335,7 @@ export default function Home() {
                   {canUpdateGeneral ? (
                     <div className="general-actions">
                       <button disabled={isGeneralLoading || isGeneralSaving} type="submit">
-                        {isGeneralSaving ? "Saving..." : "Save Changes"}
+                        {isGeneralSaving ? "Saving..." : "Save"}
                       </button>
                     </div>
                   ) : null}
@@ -4455,7 +4455,7 @@ export default function Home() {
                   {canUpdateLegal ? (
                     <div className="general-actions">
                       <button disabled={isLegalContentLoading || isLegalContentSaving} type="submit">
-                        {isLegalContentSaving ? "Saving..." : "Save Changes"}
+                        {isLegalContentSaving ? "Saving..." : "Save"}
                       </button>
                     </div>
                   ) : null}
@@ -4916,7 +4916,7 @@ export default function Home() {
                     {canUpdatePlans ? (
                       <footer className="modal-actions">
                         <button disabled={isCibilRepairSaving || isCibilRepairLoading} type="submit">
-                          {isCibilRepairSaving ? "Saving..." : cibilRepairTab === "timelines" ? "Save Timelines" : "Save Repair Content"}
+                          {isCibilRepairSaving ? "Saving..." : cibilRepairTab === "timelines" ? "Save Timelines" : "Save Plan"}
                         </button>
                       </footer>
                     ) : null}
