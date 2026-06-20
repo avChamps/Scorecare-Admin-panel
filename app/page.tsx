@@ -4113,27 +4113,6 @@ export default function Home() {
   }
 
   if (step === "admin") {
-    const isAdminApiLoading =
-      isDashboardLoading ||
-      isUsersLoading ||
-      isReportDownloadsLoading ||
-      isManualReportDownloadsLoading ||
-      isCibilUsersLoading ||
-      isEmployeesLoading ||
-      isEmployeeSaving ||
-      isEmployeeRolesLoading ||
-      isPlansLoading ||
-      isLoansLoading ||
-      isGeneralLoading ||
-      isNotificationsLoading ||
-      isNotificationSending ||
-      isFaqsLoading ||
-      isAdminPlansLoading ||
-      isFeedbackLoading ||
-      isHomepageThemesLoading ||
-      isLegalContentLoading ||
-      isChatsLoading ||
-      isContactLoading;
     const monthlyRecords = dashboardCounts?.graphs.monthlyRecords ?? [];
     const accessTypeGraph = dashboardCounts?.graphs.usersByAccessType ?? [];
     const subscriptionStatusGraph = dashboardCounts?.graphs.subscriptionsByStatus ?? [];
@@ -4519,11 +4498,6 @@ export default function Home() {
 
     return (
       <main className="admin-layout">
-        {isAdminApiLoading ? (
-          <div className="api-loader-overlay">
-            <span className="api-loader" />
-          </div>
-        ) : null}
         <aside className={`sidebar ${isSidebarCollapsed ? "collapsed" : ""}`}>
           <div className="sidebar-brand">
             <img src="/scorecare-logo.PNG" alt="ScoreCare" />
@@ -4703,6 +4677,7 @@ export default function Home() {
                 {generalError ? <p className="dashboard-error">{generalError}</p> : null}
 
                 <form className="general-form panel" onSubmit={updateGeneralSettings}>
+                  {isGeneralLoading ? <span className="table-loader" /> : null}
                   <label>
                     Website
                     <input
@@ -4787,7 +4762,7 @@ export default function Home() {
                     </div>
                   ) : null}
 
-                  {isHomepageThemesLoading ? <p className="dashboard-error">Loading homepage themes...</p> : null}
+                  {isHomepageThemesLoading ? <span className="table-loader" /> : null}
 
                   {!isHomepageThemesLoading && !homepageThemes.length ? (
                     <div className="empty-state compact">
@@ -4854,9 +4829,9 @@ export default function Home() {
                 </section>
 
                 {legalContentError ? <p className="dashboard-error">{legalContentError}</p> : null}
-                {isLegalContentLoading ? <p className="dashboard-error">Loading legal content...</p> : null}
 
                 <form className="legal-editor-panel panel" onSubmit={updateLegalContent}>
+                  {isLegalContentLoading ? <span className="table-loader" /> : null}
                   <div className="legal-panel-heading">
                     <span>Editor</span>
                     <strong>Content Editor</strong>
@@ -4937,7 +4912,8 @@ export default function Home() {
 
                     <CommonTable
                       columns={notificationColumns}
-                      emptyText="No notifications found"
+                      emptyText={isNotificationsLoading ? "Loading notifications..." : "No notifications found"}
+                      isLoading={isNotificationsLoading}
                       pagination={
                         notificationsData?.pagination
                           ? {
@@ -5018,7 +4994,7 @@ export default function Home() {
                     ) : null}
                   </div>
 
-                  {isFaqsLoading ? <p className="dashboard-error">Loading FAQs...</p> : null}
+                  {isFaqsLoading ? <span className="table-loader" /> : null}
 
                   {!isFaqsLoading && !faqCategories.length ? (
                     <div className="empty-state panel">
@@ -7003,7 +6979,13 @@ function CommonTable({
           </tr>
         </thead>
         <tbody>
-          {rows.length ? (
+          {isLoading ? (
+            <tr>
+              <td className="table-empty" colSpan={columns.length}>
+                <span className="table-loader" />
+              </td>
+            </tr>
+          ) : rows.length ? (
             rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 {row.map((cell, cellIndex) => (
@@ -7014,17 +6996,8 @@ function CommonTable({
           ) : (
             <tr>
               <td className="table-empty" colSpan={columns.length}>
-                {isLoading ? (
-                  <>
-                    <span className="table-loader" />
-                    {emptyText}
-                  </>
-                ) : (
-                  <>
-                    <img src="/no-records.svg" alt="No records found" />
-                    <strong>{emptyText}</strong>
-                  </>
-                )}
+                <img src="/no-records.svg" alt="No records found" />
+                <strong>{emptyText}</strong>
               </td>
             </tr>
           )}
