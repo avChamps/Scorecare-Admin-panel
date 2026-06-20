@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { API_BASE_URL } from "./api/api";
 
-const menuItems = ["Dashboard", "Plans & Benefits", "Users", "Subscriptions", "Loans", "Chat", "Feedback"];
+const menuItems = ["Dashboard", /* "Loans", */ "Chats", "Feedback", "Contact Us"];
 const menuIcons: Record<string, ReactNode> = {
   Dashboard: (
     <svg viewBox="0 0 24 24">
@@ -47,7 +47,7 @@ const menuIcons: Record<string, ReactNode> = {
       <path d="M14 3v4h4M9 13h5a2 2 0 0 1 0 4h-2M12 11v8" />
     </svg>
   ),
-  Chat: (
+  Chats: (
     <svg viewBox="0 0 24 24">
       <path d="M5 6h14v10H8l-3 3z" />
       <path d="M9 10h6M9 13h4" />
@@ -60,9 +60,34 @@ const menuIcons: Record<string, ReactNode> = {
       <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />
     </svg>
   ),
+  "Homepage Themes": (
+    <svg viewBox="0 0 24 24">
+      <path d="M4 5h16v14H4z" />
+      <path d="m4 15 4-4 4 4 3-3 5 5" />
+      <path d="M15 9h.01" />
+    </svg>
+  ),
+  "Legal Center": (
+    <svg viewBox="0 0 24 24">
+      <path d="M6 3h9l3 3v15H6z" />
+      <path d="M14 3v4h4M9 12h6M9 16h6" />
+    </svg>
+  ),
+  Notifications: (
+    <svg viewBox="0 0 24 24">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 6 3 9H3c0-3 3-2 3-9" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
+    </svg>
+  ),
   Feedback: (
     <svg viewBox="0 0 24 24">
       <path d="m12 3 2.6 5.4 5.9.8-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.2 5.9-.8z" />
+    </svg>
+  ),
+  "Contact Us": (
+    <svg viewBox="0 0 24 24">
+      <path d="M4 5h16v14H4z" />
+      <path d="m4 7 8 6 8-6" />
     </svg>
   ),
 };
@@ -92,6 +117,10 @@ const emptyAdminPlanForm: AdminPlanForm = {
   skipLabel: "Skip",
   displayOrder: "1",
   isActive: true,
+};
+const emptyCibilRepairContent: CibilRepairContent = {
+  plans: [],
+  timelines: [],
 };
 
 type DashboardCounts = {
@@ -126,32 +155,245 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Plans & Benefits" | "Users" | "Subscriptions" | "Loans" | "Chat" | "FAQs" | "Feedback";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us";
 
 const viewRoutes: Record<AppView, string> = {
   Dashboard: "/dashboard",
   General: "/general",
+  "Homepage Themes": "/homepage-themes",
+  "Legal Center": "/legal-center",
+  Notifications: "/notifications",
   "Plans & Benefits": "/plans-benefits",
   Users: "/users",
   Subscriptions: "/subscriptions",
   Loans: "/loans",
-  Chat: "/chat",
+  Chats: "/chat",
   FAQs: "/faqs",
   Feedback: "/feedback",
+  "Contact Us": "/contact-us",
 };
 
 const routeViews: Record<string, AppView> = {
   "/": "Dashboard",
   "/dashboard": "Dashboard",
   "/general": "General",
+  "/homepage-themes": "Homepage Themes",
+  "/legal-center": "Legal Center",
+  "/notifications": "Notifications",
   "/faqs": "FAQs",
   "/plans-benefits": "Plans & Benefits",
   "/feedback": "Feedback",
+  "/contact-us": "Contact Us",
   "/users": "Users",
   "/subscriptions": "Subscriptions",
   "/loans": "Loans",
-  "/chat": "Chat",
+  "/chat": "Chats",
 };
+
+type ActionIconType = "add" | "edit" | "delete";
+
+type HtmlEditorCommand = "bold" | "italic" | "underline" | "insertUnorderedList" | "insertOrderedList";
+
+type HtmlEditorProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function HtmlEditor({ label, value, onChange }: HtmlEditorProps) {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value || "";
+    }
+  }, [value]);
+
+  function updateValue() {
+    onChange(editorRef.current?.innerHTML || "");
+  }
+
+  function runCommand(command: HtmlEditorCommand) {
+    editorRef.current?.focus();
+    document.execCommand(command);
+    updateValue();
+  }
+
+  function setBlock(block: string) {
+    editorRef.current?.focus();
+    document.execCommand("formatBlock", false, block);
+    updateValue();
+  }
+
+  function addLink() {
+    const url = window.prompt("Enter URL");
+
+    if (!url) {
+      return;
+    }
+
+    editorRef.current?.focus();
+    document.execCommand("createLink", false, url);
+    updateValue();
+  }
+
+  return (
+    <section className="html-editor-field">
+      <div className="html-editor-label">{label}</div>
+      <div className="html-editor-toolbar">
+        <select defaultValue="" onChange={(event) => event.target.value && setBlock(event.target.value)}>
+          <option value="" disabled>Format</option>
+          <option value="p">Paragraph</option>
+          <option value="h2">Heading</option>
+        </select>
+        <button type="button" onClick={() => runCommand("bold")}>B</button>
+        <button type="button" onClick={() => runCommand("italic")}>I</button>
+        <button type="button" onClick={() => runCommand("underline")}>U</button>
+        <button type="button" onClick={() => runCommand("insertUnorderedList")}>Bullets</button>
+        <button type="button" onClick={() => runCommand("insertOrderedList")}>Numbers</button>
+        <button type="button" onClick={addLink}>Link</button>
+      </div>
+      <div
+        className="html-editor-box"
+        contentEditable
+        ref={editorRef}
+        onBlur={updateValue}
+        onInput={updateValue}
+        role="textbox"
+        suppressContentEditableWarning
+      />
+    </section>
+  );
+}
+
+function ActionIcon({ type }: { type: ActionIconType }) {
+  if (type === "add") {
+    return (
+      <svg className="button-icon" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    );
+  }
+
+  if (type === "edit") {
+    return (
+      <svg className="button-icon" viewBox="0 0 24 24">
+        <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
+        <path d="m13.5 6.5 4 4" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="button-icon" viewBox="0 0 24 24">
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </svg>
+  );
+}
+
+function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedDate = value ? new Date(`${value}T00:00:00`) : null;
+  const [visibleDate, setVisibleDate] = useState(selectedDate || new Date());
+  const monthStart = new Date(visibleDate.getFullYear(), visibleDate.getMonth(), 1);
+  const calendarStart = new Date(monthStart);
+  calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(calendarStart);
+    date.setDate(calendarStart.getDate() + index);
+    return date;
+  });
+
+  useEffect(() => {
+    function closePicker(event: MouseEvent) {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closePicker);
+    return () => document.removeEventListener("mousedown", closePicker);
+  }, []);
+
+  function formatInputDate(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatDisplayDate(dateValue: string) {
+    if (!dateValue) {
+      return label;
+    }
+
+    const [year, month, day] = dateValue.split("-");
+    return `${day}/${month}/${year}`;
+  }
+
+  function moveMonth(step: number) {
+    setVisibleDate((date) => new Date(date.getFullYear(), date.getMonth() + step, 1));
+  }
+
+  return (
+    <div className="date-filter" ref={pickerRef}>
+      <button className={`date-filter-trigger ${value ? "selected" : ""}`} type="button" onClick={() => setIsOpen((current) => !current)}>
+        <span>{formatDisplayDate(value)}</span>
+        <svg viewBox="0 0 24 24">
+          <path d="M7 3v3M17 3v3M4 9h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
+        </svg>
+      </button>
+      {isOpen ? (
+        <div className="date-picker-popover">
+          <div className="date-picker-header">
+            <button type="button" onClick={() => moveMonth(-1)}>‹</button>
+            <strong>{visibleDate.toLocaleString("default", { month: "long", year: "numeric" })}</strong>
+            <button type="button" onClick={() => moveMonth(1)}>›</button>
+          </div>
+          <div className="date-picker-weekdays">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+          <div className="date-picker-days">
+            {days.map((date) => {
+              const dateValue = formatInputDate(date);
+              const isMuted = date.getMonth() !== visibleDate.getMonth();
+              const isSelected = value === dateValue;
+              const isToday = formatInputDate(new Date()) === dateValue;
+
+              return (
+                <button
+                  className={`${isMuted ? "muted" : ""} ${isToday ? "today" : ""} ${isSelected ? "selected" : ""}`}
+                  key={dateValue}
+                  type="button"
+                  onClick={() => {
+                    onChange(dateValue);
+                    setIsOpen(false);
+                  }}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+          <div className="date-picker-footer">
+            <button type="button" onClick={() => onChange("")}>Clear</button>
+            <button type="button" onClick={() => {
+              onChange(formatInputDate(new Date()));
+              setVisibleDate(new Date());
+              setIsOpen(false);
+            }}>
+              Today
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type UserRow = {
   id: string;
@@ -159,6 +401,9 @@ type UserRow = {
   fullName: string;
   mobileNumber: string;
   email: string;
+  panNumber?: string | null;
+  dob?: string | null;
+  dateOfBirth?: string | null;
   status: string;
   accessType: string;
   subscriptionStatus: string;
@@ -212,6 +457,28 @@ type AdminPlanForm = {
   skipLabel: string;
   displayOrder: string;
   isActive: boolean;
+};
+
+type CibilRepairPlan = {
+  publicId: string;
+  planName: string;
+  amount: number | string;
+  gstPercentage: number | string;
+  offerTag: string;
+};
+
+type CibilRepairTimeline = {
+  publicId?: string;
+  localId?: string;
+  displayOrder: number | string;
+  title: string;
+  description: string;
+  isActive: boolean;
+};
+
+type CibilRepairContent = {
+  plans: CibilRepairPlan[];
+  timelines: CibilRepairTimeline[];
 };
 
 type UsersResponse = {
@@ -311,12 +578,88 @@ type FeedbackResponse = {
   };
 };
 
+type ContactRequestRow = {
+  id?: number;
+  firstName?: string;
+  lastName?: string;
+  emailAddress?: string;
+  fullName?: string;
+  name?: string;
+  mobileNumber?: string;
+  phone?: string;
+  email?: string;
+  subject?: string;
+  message?: string;
+  createdAt?: string;
+};
+
+type ContactRequestsResponse = {
+  contactRequests: ContactRequestRow[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+type AdminNotificationRow = {
+  id?: number;
+  title?: string;
+  message?: string;
+  scope?: string;
+  screen?: string;
+  data?: {
+    screen?: string;
+    source?: string;
+    batchId?: string;
+  };
+  imageUrl?: string | null;
+  createdAt?: string;
+  user?: {
+    fullName?: string;
+    mobileNumber?: string;
+    email?: string;
+  };
+};
+
+type AdminNotificationsResponse = {
+  notifications: AdminNotificationRow[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 type GeneralSettings = {
   website: string;
   email: string;
   mobileNumber: string;
   whatsappNumber: string;
   selectedLanguage: string;
+};
+
+type HomepageTheme = {
+  id?: number;
+  imageName: string;
+  fileName: string;
+  isActive: boolean;
+};
+
+type LegalContent = {
+  id?: number;
+  termsAndConditions: string;
+  privacyPolicy: string;
+  consent: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type HomepageThemeForm = HomepageTheme & {
+  image: File | null;
+  originalImageName: string;
 };
 
 type FaqQuestion = {
@@ -351,7 +694,10 @@ export default function Home() {
   const [isSessionChecking, setIsSessionChecking] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isGeneralMenuOpen, setIsGeneralMenuOpen] = useState(true);
+  const [isGeneralMenuOpen, setIsGeneralMenuOpen] = useState(false);
+  const [isUserManagementMenuOpen, setIsUserManagementMenuOpen] = useState(false);
+  const [isSubscriptionsMenuOpen, setIsSubscriptionsMenuOpen] = useState(false);
+  const [isPlansBenefitsMenuOpen, setIsPlansBenefitsMenuOpen] = useState(false);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [activeView, setActiveView] = useState<AppView>("Dashboard");
   const [usersData, setUsersData] = useState<UsersResponse | null>(null);
@@ -386,6 +732,44 @@ export default function Home() {
   const [isGeneralLoading, setIsGeneralLoading] = useState(false);
   const [isGeneralSaving, setIsGeneralSaving] = useState(false);
   const [hasLoadedGeneral, setHasLoadedGeneral] = useState(false);
+  const [homepageThemes, setHomepageThemes] = useState<HomepageTheme[]>([]);
+  const [homepageThemeForm, setHomepageThemeForm] = useState<HomepageThemeForm>({
+    imageName: "",
+    fileName: "",
+    isActive: true,
+    image: null,
+    originalImageName: "",
+  });
+  const [homepageThemesError, setHomepageThemesError] = useState("");
+  const [isHomepageThemesLoading, setIsHomepageThemesLoading] = useState(false);
+  const [savingHomepageTheme, setSavingHomepageTheme] = useState("");
+  const [isHomepageThemeModalOpen, setIsHomepageThemeModalOpen] = useState(false);
+  const [deletingHomepageTheme, setDeletingHomepageTheme] = useState<HomepageTheme | null>(null);
+  const [isDeletingHomepageTheme, setIsDeletingHomepageTheme] = useState(false);
+  const [hasLoadedHomepageThemes, setHasLoadedHomepageThemes] = useState(false);
+  const [legalContent, setLegalContent] = useState<LegalContent>({
+    termsAndConditions: "",
+    privacyPolicy: "",
+    consent: "",
+  });
+  const [legalContentError, setLegalContentError] = useState("");
+  const [isLegalContentLoading, setIsLegalContentLoading] = useState(false);
+  const [isLegalContentSaving, setIsLegalContentSaving] = useState(false);
+  const [hasLoadedLegalContent, setHasLoadedLegalContent] = useState(false);
+  const [notificationUsersData, setNotificationUsersData] = useState<UsersResponse | null>(null);
+  const [notificationUserSearch, setNotificationUserSearch] = useState("");
+  const [selectedNotificationUserIds, setSelectedNotificationUserIds] = useState<string[]>([]);
+  const [notificationTitle, setNotificationTitle] = useState("");
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationImageUrl, setNotificationImageUrl] = useState("");
+  const [notificationScreen, setNotificationScreen] = useState("home");
+  const [notificationsTab, setNotificationsTab] = useState<"notifications" | "users">("notifications");
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [notificationModalScope, setNotificationModalScope] = useState<"all" | "users">("all");
+  const [notificationsData, setNotificationsData] = useState<AdminNotificationsResponse | null>(null);
+  const [notificationsError, setNotificationsError] = useState("");
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+  const [isNotificationSending, setIsNotificationSending] = useState(false);
   const [faqCategories, setFaqCategories] = useState<FaqCategory[]>([]);
   const [faqsError, setFaqsError] = useState("");
   const [isFaqsLoading, setIsFaqsLoading] = useState(false);
@@ -398,14 +782,29 @@ export default function Home() {
   const [hasLoadedAdminPlans, setHasLoadedAdminPlans] = useState(false);
   const [editingAdminPlanId, setEditingAdminPlanId] = useState<string | null>(null);
   const [adminPlanForm, setAdminPlanForm] = useState<AdminPlanForm>(emptyAdminPlanForm);
-  const [plansBenefitsTab, setPlansBenefitsTab] = useState<"plans" | "benefits">("plans");
+  const [plansBenefitsTab, setPlansBenefitsTab] = useState<"plans" | "repair" | "benefits">("repair");
   const [isAdminPlanModalOpen, setIsAdminPlanModalOpen] = useState(false);
+  const [cibilRepairContent, setCibilRepairContent] = useState<CibilRepairContent>(emptyCibilRepairContent);
+  const [cibilRepairError, setCibilRepairError] = useState("");
+  const [isCibilRepairLoading, setIsCibilRepairLoading] = useState(false);
+  const [isCibilRepairSaving, setIsCibilRepairSaving] = useState(false);
+  const [hasLoadedCibilRepair, setHasLoadedCibilRepair] = useState(false);
+  const [cibilRepairTab, setCibilRepairTab] = useState<"plans" | "timelines">("plans");
+  const [deletingCibilRepairTimelineIndex, setDeletingCibilRepairTimelineIndex] = useState<number | null>(null);
+  const newCibilRepairTimelineRef = useRef<HTMLElement | null>(null);
+  const shouldScrollToNewCibilRepairTimeline = useRef(false);
   const [feedbackData, setFeedbackData] = useState<FeedbackResponse | null>(null);
   const [feedbackSearch, setFeedbackSearch] = useState("");
   const [feedbackFromDate, setFeedbackFromDate] = useState("");
   const [feedbackToDate, setFeedbackToDate] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
+  const [contactRequestsData, setContactRequestsData] = useState<ContactRequestsResponse | null>(null);
+  const [contactSearch, setContactSearch] = useState("");
+  const [contactFromDate, setContactFromDate] = useState("");
+  const [contactToDate, setContactToDate] = useState("");
+  const [contactError, setContactError] = useState("");
+  const [isContactLoading, setIsContactLoading] = useState(false);
 
   function loadAdminViewData(view: AppView) {
     if (view === "General" && !hasLoadedGeneral) {
@@ -416,12 +815,29 @@ export default function Home() {
       loadFaqs();
     }
 
+    if (view === "Homepage Themes" && !hasLoadedHomepageThemes) {
+      loadHomepageThemes();
+    }
+
+    if (view === "Legal Center" && !hasLoadedLegalContent) {
+      loadLegalContent();
+    }
+
+    if (view === "Notifications" && !notificationUsersData) {
+      loadNotificationUsers();
+      loadAdminNotifications();
+    }
+
     if (view === "Plans & Benefits" && !hasLoadedAdminPlans) {
       loadAdminPlans();
     }
 
     if (view === "Feedback" && !feedbackData) {
       loadFeedback();
+    }
+
+    if (view === "Contact Us" && !contactRequestsData) {
+      loadContactRequests();
     }
 
     if ((view === "Users" || view === "Subscriptions") && !usersData) {
@@ -432,7 +848,7 @@ export default function Home() {
       loadLoans();
     }
 
-    if (view === "Chat" && !chatsData) {
+    if (view === "Chats" && !chatsData) {
       loadChats();
     }
   }
@@ -445,6 +861,19 @@ export default function Home() {
 
     if (window.matchMedia("(max-width: 560px)").matches) {
       setIsSidebarCollapsed(true);
+    }
+  }
+
+  function openPlansBenefitsTab(tab: "plans" | "repair" | "benefits") {
+    setPlansBenefitsTab(tab);
+    openAdminView("Plans & Benefits");
+
+    if (tab === "repair") {
+      setCibilRepairTab("plans");
+    }
+
+    if (tab === "repair" && !hasLoadedCibilRepair) {
+      loadCibilRepairContent();
     }
   }
   const [downloadingLoanId, setDownloadingLoanId] = useState<number | null>(null);
@@ -494,7 +923,7 @@ export default function Home() {
       setIsUsersLoading(true);
       const params = new URLSearchParams({
         page: String(page),
-        limit: "20",
+        limit: "10",
         search,
       });
 
@@ -540,7 +969,7 @@ export default function Home() {
       setIsFeedbackLoading(true);
       const params = new URLSearchParams({
         page: String(page),
-        limit: "20",
+        limit: "10",
       });
 
       if (search) {
@@ -576,6 +1005,46 @@ export default function Home() {
       setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback");
     } finally {
       setIsFeedbackLoading(false);
+    }
+  }
+
+  async function loadContactRequests(page = 1, search = contactSearch, from = contactFromDate, to = contactToDate) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setContactError("");
+      setIsContactLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "20",
+        search,
+        from,
+        totime: to,
+      });
+
+      const response = await fetch(`${API_BASE_URL}/admin/contact-requests?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load contact requests");
+      }
+
+      setContactRequestsData(result.data);
+    } catch (error) {
+      setContactError(error instanceof Error ? error.message : "Unable to load contact requests");
+    } finally {
+      setIsContactLoading(false);
     }
   }
 
@@ -615,6 +1084,132 @@ export default function Home() {
       setGeneralError(error instanceof Error ? error.message : "Unable to load general settings");
     } finally {
       setIsGeneralLoading(false);
+    }
+  }
+
+  async function loadNotificationUsers(page = 1, search = notificationUserSearch) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setNotificationsError("");
+      setIsNotificationsLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "10",
+        search,
+      });
+      const response = await fetch(`${API_BASE_URL}/admin/users?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load users");
+      }
+
+      setNotificationUsersData(result.data);
+    } catch (error) {
+      setNotificationsError(error instanceof Error ? error.message : "Unable to load users");
+    } finally {
+      setIsNotificationsLoading(false);
+    }
+  }
+
+  async function loadAdminNotifications(page = 1) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setNotificationsError("");
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "20",
+        search: "",
+        from: "",
+        totime: "",
+      });
+      const response = await fetch(`${API_BASE_URL}/admin/app-notifications?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load notifications");
+      }
+
+      setNotificationsData(result.data);
+    } catch (error) {
+      setNotificationsError(error instanceof Error ? error.message : "Unable to load notifications");
+    }
+  }
+
+  async function sendAdminNotification(scope: "all" | "users") {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    if (scope === "users" && !selectedNotificationUserIds.length) {
+      setNotificationsError("Select at least one user");
+      return;
+    }
+
+    try {
+      setNotificationsError("");
+      setIsNotificationSending(true);
+      const response = await fetch(`${API_BASE_URL}/admin/app-notifications`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          scope,
+          ...(scope === "users" ? { userPublicIds: selectedNotificationUserIds } : {}),
+          title: notificationTitle,
+          message: notificationMessage,
+          imageUrl: notificationImageUrl,
+          screen: notificationScreen,
+          data: { source: "admin" },
+        }),
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to send notification");
+      }
+
+      showToast("success", "Notification sent successfully");
+      setSelectedNotificationUserIds([]);
+      closeNotificationModal();
+      await loadAdminNotifications();
+    } catch (error) {
+      setNotificationsError(error instanceof Error ? error.message : "Unable to send notification");
+    } finally {
+      setIsNotificationSending(false);
     }
   }
 
@@ -663,6 +1258,259 @@ export default function Home() {
     } finally {
       setIsGeneralSaving(false);
     }
+  }
+
+  async function loadLegalContent() {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setLegalContentError("");
+      setIsLegalContentLoading(true);
+      const response = await fetch(`${API_BASE_URL}/legal-content`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load legal content");
+      }
+
+      setLegalContent({
+        id: result.data?.id,
+        termsAndConditions: result.data?.termsAndConditions || "",
+        privacyPolicy: result.data?.privacyPolicy || "",
+        consent: result.data?.consent || "",
+        createdAt: result.data?.createdAt,
+        updatedAt: result.data?.updatedAt,
+      });
+      setHasLoadedLegalContent(true);
+    } catch (error) {
+      setLegalContentError(error instanceof Error ? error.message : "Unable to load legal content");
+    } finally {
+      setIsLegalContentLoading(false);
+    }
+  }
+
+  async function updateLegalContent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setLegalContentError("");
+      setIsLegalContentSaving(true);
+      const response = await fetch(`${API_BASE_URL}/legal-content`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          termsAndConditions: legalContent.termsAndConditions,
+          privacyPolicy: legalContent.privacyPolicy,
+          consent: legalContent.consent,
+        }),
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to update legal content");
+      }
+
+      setLegalContent({
+        id: result.data?.id,
+        termsAndConditions: result.data?.termsAndConditions || legalContent.termsAndConditions,
+        privacyPolicy: result.data?.privacyPolicy || legalContent.privacyPolicy,
+        consent: result.data?.consent || legalContent.consent,
+        createdAt: result.data?.createdAt,
+        updatedAt: result.data?.updatedAt,
+      });
+      setHasLoadedLegalContent(true);
+      showToast("success", "Legal content updated successfully");
+    } catch (error) {
+      setLegalContentError(error instanceof Error ? error.message : "Unable to update legal content");
+    } finally {
+      setIsLegalContentSaving(false);
+    }
+  }
+
+  async function loadHomepageThemes() {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setHomepageThemesError("");
+      setIsHomepageThemesLoading(true);
+      const response = await fetch(`${API_BASE_URL}/general/homepage-image-theme`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load homepage themes");
+      }
+
+      setHomepageThemes(result.data || []);
+      setHasLoadedHomepageThemes(true);
+    } catch (error) {
+      setHomepageThemesError(error instanceof Error ? error.message : "Unable to load homepage themes");
+    } finally {
+      setIsHomepageThemesLoading(false);
+    }
+  }
+
+  function openHomepageThemeModal(theme?: HomepageTheme) {
+    setHomepageThemeForm({
+      imageName: theme?.imageName || "",
+      fileName: theme?.fileName || "",
+      isActive: theme?.isActive ?? true,
+      image: null,
+      originalImageName: theme?.imageName || "",
+    });
+    setIsHomepageThemeModalOpen(true);
+  }
+
+  function closeHomepageThemeModal() {
+    setIsHomepageThemeModalOpen(false);
+    setHomepageThemeForm({
+      imageName: "",
+      fileName: "",
+      isActive: true,
+      image: null,
+      originalImageName: "",
+    });
+  }
+
+  async function saveHomepageTheme(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setHomepageThemesError("");
+      setSavingHomepageTheme(homepageThemeForm.imageName);
+
+      const formData = new FormData();
+      formData.append("imageName", homepageThemeForm.imageName);
+      formData.append("isActive", String(homepageThemeForm.isActive));
+
+      if (homepageThemeForm.image) {
+        formData.append("image", homepageThemeForm.image);
+      }
+
+      const response = await fetch(`${API_BASE_URL}/general/homepage-image-theme`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to update homepage theme");
+      }
+
+      setHomepageThemes((themes) =>
+        homepageThemeForm.originalImageName
+          ? themes.map((item) => (item.imageName === homepageThemeForm.originalImageName ? { ...item, ...result.data } : item))
+          : [...themes, result.data]
+      );
+      closeHomepageThemeModal();
+      showToast("success", result.message || "Homepage image theme updated successfully");
+    } catch (error) {
+      setHomepageThemesError(error instanceof Error ? error.message : "Unable to update homepage theme");
+    } finally {
+      setSavingHomepageTheme("");
+    }
+  }
+
+  function openDeleteHomepageThemeModal(theme: HomepageTheme) {
+    setDeletingHomepageTheme(theme);
+  }
+
+  function closeDeleteHomepageThemeModal() {
+    if (isDeletingHomepageTheme) {
+      return;
+    }
+
+    setDeletingHomepageTheme(null);
+  }
+
+  async function deleteHomepageTheme() {
+    if (!adminUser?.token || !deletingHomepageTheme?.id) {
+      return;
+    }
+
+    try {
+      setHomepageThemesError("");
+      setIsDeletingHomepageTheme(true);
+      const response = await fetch(`${API_BASE_URL}/general/homepage-image-theme/${deletingHomepageTheme.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to delete homepage theme");
+      }
+
+      setHomepageThemes((themes) => themes.filter((theme) => theme.id !== deletingHomepageTheme.id));
+      setDeletingHomepageTheme(null);
+      showToast("success", result.message || "Homepage image theme deleted successfully");
+    } catch (error) {
+      setHomepageThemesError(error instanceof Error ? error.message : "Unable to delete homepage theme");
+    } finally {
+      setIsDeletingHomepageTheme(false);
+    }
+  }
+
+  function getHomepageThemeImageUrl(fileName: string) {
+    if (!fileName) {
+      return "";
+    }
+
+    return fileName.startsWith("http") ? fileName : `${API_BASE_URL}/uploads/${fileName}`;
   }
 
   async function loadFaqs() {
@@ -943,6 +1791,250 @@ export default function Home() {
     }
   }
 
+  function getCibilRepairContentFromResponse(result: { data?: CibilRepairContent }) {
+    return {
+      plans: (result.data?.plans || []).map((plan) => ({
+        publicId: plan.publicId || "",
+        planName: plan.planName || "",
+        amount: plan.amount ?? "",
+        gstPercentage: plan.gstPercentage ?? "",
+        offerTag: plan.offerTag || "",
+      })),
+      timelines: (result.data?.timelines || []).map((timeline) => ({
+        publicId: timeline.publicId || "",
+        localId: timeline.publicId || `timeline-${timeline.displayOrder ?? ""}-${timeline.title || ""}`,
+        displayOrder: timeline.displayOrder ?? "",
+        title: timeline.title || "",
+        description: timeline.description || "",
+        isActive: timeline.isActive ?? true,
+      })),
+    };
+  }
+
+  function getCibilRepairPayload() {
+    return {
+      plans: cibilRepairContent.plans.map((plan) => ({
+        publicId: plan.publicId,
+        planName: plan.planName,
+        amount: Number(plan.amount),
+        gstPercentage: Number(plan.gstPercentage),
+        offerTag: plan.offerTag,
+      })),
+      timelines: cibilRepairContent.timelines.map((timeline) => ({
+        ...(timeline.publicId ? { publicId: timeline.publicId } : {}),
+        displayOrder: Number(timeline.displayOrder),
+        title: timeline.title,
+        description: timeline.description,
+        isActive: timeline.isActive,
+      })),
+    };
+  }
+
+  function getCibilRepairTimelinePayload(timeline: CibilRepairTimeline) {
+    return {
+      title: timeline.title,
+      description: timeline.description,
+      displayOrder: Number(timeline.displayOrder),
+      isActive: timeline.isActive,
+    };
+  }
+
+  async function loadCibilRepairContent() {
+    try {
+      setCibilRepairError("");
+      setIsCibilRepairLoading(true);
+      const response = await fetch(`${API_BASE_URL}/cibil-repair-content`);
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load repair content");
+      }
+
+      setCibilRepairContent(getCibilRepairContentFromResponse(result));
+      setHasLoadedCibilRepair(true);
+    } catch (error) {
+      setCibilRepairError(error instanceof Error ? error.message : "Unable to load repair content");
+    } finally {
+      setIsCibilRepairLoading(false);
+    }
+  }
+
+  async function saveCibilRepairContent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token) {
+      return;
+    }
+
+    if (cibilRepairTab === "timelines") {
+      await saveCibilRepairTimelines();
+      return;
+    }
+
+    try {
+      setCibilRepairError("");
+      setIsCibilRepairSaving(true);
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-content`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(getCibilRepairPayload()),
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to save repair content");
+      }
+
+      if (result.data) {
+        setCibilRepairContent(getCibilRepairContentFromResponse(result));
+      }
+      setHasLoadedCibilRepair(true);
+      showToast("success", "Repair content updated successfully");
+    } catch (error) {
+      setCibilRepairError(error instanceof Error ? error.message : "Unable to save repair content");
+    } finally {
+      setIsCibilRepairSaving(false);
+    }
+  }
+
+  async function saveCibilRepairTimelines() {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setCibilRepairError("");
+      setIsCibilRepairSaving(true);
+
+      for (const timeline of cibilRepairContent.timelines) {
+        const response = await fetch(
+          timeline.publicId
+            ? `${API_BASE_URL}/admin/cibil-repair-content/timelines/${timeline.publicId}`
+            : `${API_BASE_URL}/admin/cibil-repair-content/timelines`,
+          {
+            method: timeline.publicId ? "PATCH" : "POST",
+            headers: {
+              Authorization: `Bearer ${adminUser.token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(getCibilRepairTimelinePayload(timeline)),
+          }
+        );
+        const result = await response.json();
+
+        if (response.status === 401 || response.status === 403) {
+          sessionStorage.removeItem("scorecare_admin");
+          setStep("mobile");
+          setAdminUser(null);
+          return;
+        }
+
+        if (!response.ok || result.status !== "success") {
+          throw new Error(result.message || "Unable to save timeline");
+        }
+      }
+
+      await loadCibilRepairContent();
+      showToast("success", "Timelines updated successfully");
+    } catch (error) {
+      setCibilRepairError(error instanceof Error ? error.message : "Unable to save timelines");
+    } finally {
+      setIsCibilRepairSaving(false);
+    }
+  }
+
+  function updateCibilRepairPlan(index: number, field: keyof CibilRepairPlan, value: string) {
+    setCibilRepairContent((content) => ({
+      ...content,
+      plans: content.plans.map((plan, planIndex) => (planIndex === index ? { ...plan, [field]: value } : plan)),
+    }));
+  }
+
+  function updateCibilRepairTimeline(index: number, field: keyof CibilRepairTimeline, value: string | boolean) {
+    setCibilRepairContent((content) => ({
+      ...content,
+      timelines: content.timelines.map((timeline, timelineIndex) =>
+        timelineIndex === index ? { ...timeline, [field]: value } : timeline
+      ),
+    }));
+  }
+
+  function addCibilRepairPlan() {
+    setCibilRepairContent((content) => ({
+      ...content,
+      plans: [...content.plans, { publicId: "", planName: "", amount: "", gstPercentage: "", offerTag: "" }],
+    }));
+  }
+
+  function addCibilRepairTimeline() {
+    setCibilRepairTab("timelines");
+    shouldScrollToNewCibilRepairTimeline.current = true;
+    setCibilRepairContent((content) => ({
+      ...content,
+      timelines: [
+        ...content.timelines,
+        { localId: `new-timeline-${Date.now()}`, displayOrder: content.timelines.length + 1, title: "", description: "", isActive: true },
+      ],
+    }));
+  }
+
+  function removeCibilRepairPlan(index: number) {
+    setCibilRepairContent((content) => ({
+      ...content,
+      plans: content.plans.filter((_, planIndex) => planIndex !== index),
+    }));
+  }
+
+  async function removeCibilRepairTimeline(index: number) {
+    const timeline = cibilRepairContent.timelines[index];
+
+    if (timeline?.publicId && adminUser?.token) {
+      try {
+        setCibilRepairError("");
+        setIsCibilRepairSaving(true);
+        const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-content/timelines/${timeline.publicId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${adminUser.token}` },
+        });
+        const result = await response.json();
+
+        if (response.status === 401 || response.status === 403) {
+          sessionStorage.removeItem("scorecare_admin");
+          setStep("mobile");
+          setAdminUser(null);
+          return;
+        }
+
+        if (!response.ok || result.status !== "success") {
+          throw new Error(result.message || "Unable to delete timeline");
+        }
+
+        showToast("success", "Timeline deleted successfully");
+      } catch (error) {
+        setCibilRepairError(error instanceof Error ? error.message : "Unable to delete timeline");
+        return;
+      } finally {
+        setIsCibilRepairSaving(false);
+      }
+    }
+
+    setCibilRepairContent((content) => ({
+      ...content,
+      timelines: content.timelines.filter((_, timelineIndex) => timelineIndex !== index),
+    }));
+    setDeletingCibilRepairTimelineIndex(null);
+  }
+
   function updateFaqCategory(categoryIndex: number, field: keyof Omit<FaqCategory, "questions">, value: string) {
     setFaqCategories((categories) =>
       categories.map((category, index) => (index === categoryIndex ? { ...category, [field]: value } : category))
@@ -954,11 +2046,11 @@ export default function Home() {
       categories.map((category, index) =>
         index === categoryIndex
           ? {
-              ...category,
-              questions: category.questions.map((question, currentQuestionIndex) =>
-                currentQuestionIndex === questionIndex ? { ...question, [field]: value } : question
-              ),
-            }
+            ...category,
+            questions: category.questions.map((question, currentQuestionIndex) =>
+              currentQuestionIndex === questionIndex ? { ...question, [field]: value } : question
+            ),
+          }
           : category
       )
     );
@@ -985,12 +2077,12 @@ export default function Home() {
       categories.map((category, index) =>
         index === categoryIndex
           ? {
-              ...category,
-              questions: [
-                ...category.questions,
-                { question: "", answer: "", displayOrder: category.questions.length + 1, isActive: true },
-              ],
-            }
+            ...category,
+            questions: [
+              ...category.questions,
+              { question: "", answer: "", displayOrder: category.questions.length + 1, isActive: true },
+            ],
+          }
           : category
       )
     );
@@ -1182,6 +2274,44 @@ export default function Home() {
     loadUsers(1, "");
   }
 
+  function toggleNotificationUser(publicId: string) {
+    setSelectedNotificationUserIds((ids) =>
+      ids.includes(publicId) ? ids.filter((id) => id !== publicId) : [...ids, publicId]
+    );
+  }
+
+  function toggleAllNotificationUsers() {
+    const pageIds = notificationUsersData?.users.map((user) => user.publicId) || [];
+    const isAllSelected = pageIds.length > 0 && pageIds.every((id) => selectedNotificationUserIds.includes(id));
+
+    setSelectedNotificationUserIds((ids) =>
+      isAllSelected ? ids.filter((id) => !pageIds.includes(id)) : Array.from(new Set([...ids, ...pageIds]))
+    );
+  }
+
+  function openNotificationModal(scope: "all" | "users", userPublicId?: string) {
+    if (scope === "users" && userPublicId) {
+      setSelectedNotificationUserIds([userPublicId]);
+    }
+
+    if (scope === "users" && !userPublicId && !selectedNotificationUserIds.length) {
+      setNotificationsError("Select at least one user");
+      return;
+    }
+
+    setNotificationsError("");
+    setNotificationModalScope(scope);
+    setIsNotificationModalOpen(true);
+  }
+
+  function closeNotificationModal() {
+    setIsNotificationModalOpen(false);
+    setNotificationTitle("");
+    setNotificationMessage("");
+    setNotificationImageUrl("");
+    setNotificationScreen("home");
+  }
+
   function resetLoansFilters() {
     setLoansSearch("");
     setLoansStatus("");
@@ -1198,6 +2328,13 @@ export default function Home() {
     setFeedbackFromDate("");
     setFeedbackToDate("");
     loadFeedback(1, "", "", "");
+  }
+
+  function resetContactFilters() {
+    setContactSearch("");
+    setContactFromDate("");
+    setContactToDate("");
+    loadContactRequests(1, "", "", "");
   }
 
   async function loadSubscriptionPlans(user: UserRow) {
@@ -1328,6 +2465,15 @@ export default function Home() {
 
     if (routeView) {
       setActiveView(routeView);
+
+      setIsGeneralMenuOpen(["General", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].includes(routeView));
+      setIsUserManagementMenuOpen(routeView === "Users");
+      setIsSubscriptionsMenuOpen(routeView === "Subscriptions");
+      setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits");
+
+      if (routeView === "Plans & Benefits") {
+        setPlansBenefitsTab("repair");
+      }
     }
 
     if (pathname === "/login") {
@@ -1358,10 +2504,50 @@ export default function Home() {
   }, [activeView, adminUser?.token, hasLoadedFaqs, isFaqsLoading]);
 
   useEffect(() => {
+    if (activeView === "Notifications" && adminUser?.token && !notificationUsersData && !isNotificationsLoading) {
+      loadNotificationUsers();
+      loadAdminNotifications();
+    }
+  }, [activeView, adminUser?.token, notificationUsersData, isNotificationsLoading]);
+
+  useEffect(() => {
     if (activeView === "Plans & Benefits" && adminUser?.token && !hasLoadedAdminPlans && !isAdminPlansLoading) {
       loadAdminPlans();
     }
   }, [activeView, adminUser?.token, hasLoadedAdminPlans, isAdminPlansLoading]);
+
+  useEffect(() => {
+    if (activeView === "Plans & Benefits" && plansBenefitsTab === "repair" && !hasLoadedCibilRepair && !isCibilRepairLoading) {
+      loadCibilRepairContent();
+    }
+  }, [activeView, plansBenefitsTab, hasLoadedCibilRepair, isCibilRepairLoading]);
+
+  useEffect(() => {
+    if (!shouldScrollToNewCibilRepairTimeline.current) {
+      return;
+    }
+
+    newCibilRepairTimelineRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    shouldScrollToNewCibilRepairTimeline.current = false;
+  }, [cibilRepairContent.timelines.length]);
+
+  useEffect(() => {
+    if ((activeView === "Users" || activeView === "Subscriptions") && adminUser?.token && !usersData && !isUsersLoading) {
+      loadUsers();
+    }
+  }, [activeView, adminUser?.token, usersData, isUsersLoading]);
+
+  useEffect(() => {
+    if (activeView === "Feedback" && adminUser?.token && !feedbackData && !isFeedbackLoading) {
+      loadFeedback();
+    }
+  }, [activeView, adminUser?.token, feedbackData, isFeedbackLoading]);
+
+  useEffect(() => {
+    if (activeView === "Contact Us" && adminUser?.token && !contactRequestsData && !isContactLoading) {
+      loadContactRequests();
+    }
+  }, [activeView, adminUser?.token, contactRequestsData, isContactLoading]);
 
   useEffect(() => {
     if (step !== "otp") {
@@ -1599,10 +2785,15 @@ export default function Home() {
       isPlansLoading ||
       isLoansLoading ||
       isGeneralLoading ||
+      isNotificationsLoading ||
+      isNotificationSending ||
       isFaqsLoading ||
       isAdminPlansLoading ||
       isFeedbackLoading ||
-      isChatsLoading;
+      isHomepageThemesLoading ||
+      isLegalContentLoading ||
+      isChatsLoading ||
+      isContactLoading;
     const statCards = [
       { label: "Total Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, tone: "blue" },
       { label: "Subscriptions", value: dashboardCounts?.subscriptions ?? 0, meta: `₹${dashboardCounts?.amount ?? 0}`, tone: "green" },
@@ -1651,9 +2842,47 @@ export default function Home() {
       formatDate(user.subscriptionDueAt),
       user.planUpdatedByUserName || "-",
       user.status,
-      <button className="table-action" type="button" onClick={() => loadSubscriptionPlans(user)}>
-        Update Plan
+      <div className="subscription-actions">
+        <button className="table-action primary" type="button" onClick={() => loadSubscriptionPlans(user)}>
+          <ActionIcon type="edit" />
+          Update
+        </button>
+      </div>,
+    ]) ?? [];
+    const notificationPageUserIds = notificationUsersData?.users.map((user) => user.publicId) || [];
+    const areAllNotificationUsersSelected =
+      notificationPageUserIds.length > 0 && notificationPageUserIds.every((id) => selectedNotificationUserIds.includes(id));
+    const notificationUserColumns = [
+      <input checked={areAllNotificationUsersSelected} type="checkbox" onChange={toggleAllNotificationUsers} />,
+      "Name",
+      "PAN",
+      "DOB",
+      "Mobile",
+      "CIBIL Score",
+      "Subscription Type",
+      "Due Date",
+      "Action",
+    ];
+    const notificationUserRows = notificationUsersData?.users.map((user) => [
+      <input checked={selectedNotificationUserIds.includes(user.publicId)} type="checkbox" onChange={() => toggleNotificationUser(user.publicId)} />,
+      user.fullName,
+      user.panNumber || "-",
+      formatDate(user.dob || user.dateOfBirth || null),
+      user.mobileNumber,
+      user.creditScore || "-",
+      user.subscriptionStatus || "-",
+      formatDate(user.subscriptionDueAt),
+      <button className="table-action" type="button" onClick={() => openNotificationModal("users", user.publicId)}>
+        Send Notification
       </button>,
+    ]) ?? [];
+    const notificationColumns = ["Title", "Message", "User", "Screen", "Created At"];
+    const notificationRows = notificationsData?.notifications.map((notification) => [
+      notification.title || "-",
+      notification.message || "-",
+      notification.scope || notification.user?.fullName || "-",
+      notification.screen || notification.data?.screen || "-",
+      formatDate(notification.createdAt || null),
     ]) ?? [];
     const loanColumns = ["Name", "Mobile", "PAN", "Email", "Amount", "Loan Type", "Employment", "Income", "Experience", "Status", "Remarks", "Updated By", "Created At", "Action"];
     const loanRows = loansData?.loans.map((loan) => [
@@ -1675,6 +2904,7 @@ export default function Home() {
           {downloadingLoanId === loan.id ? "Downloading..." : "Download"}
         </button>
         <button className="table-action" type="button" onClick={() => openLoanUpdate(loan)}>
+          <ActionIcon type="edit" />
           Update
         </button>
       </div>,
@@ -1699,6 +2929,13 @@ export default function Home() {
       feedback.isLiked ? "Liked" : feedback.isDisliked ? "Disliked" : "-",
       feedback.message || "-",
       formatDate(feedback.createdAt),
+    ]) ?? [];
+    const contactColumns = ["Name", "Email", "Message", "Created At"];
+    const contactRows = contactRequestsData?.contactRequests.map((request) => [
+      request.fullName || request.name || `${request.firstName || ""} ${request.lastName || ""}`.trim() || "-",
+      request.emailAddress || request.email || "-",
+      request.message || "-",
+      formatDate(request.createdAt || null),
     ]) ?? [];
 
     return (
@@ -1727,25 +2964,88 @@ export default function Home() {
                   {item}
                 </button>
                 {item === "Dashboard" ? (
-                  <div className={`sidebar-group ${activeView === "General" || activeView === "FAQs" ? "active" : ""}`}>
-                    <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
-                      <span className="menu-icon">{menuIcons.General}</span>
-                      General
-                      <span className="sidebar-chevron">{isGeneralMenuOpen ? "⌄" : "›"}</span>
-                    </button>
-                    {isGeneralMenuOpen ? (
-                      <div className="sidebar-submenu">
-                        <button className={activeView === "General" ? "active" : ""} type="button" onClick={() => openAdminView("General")}>
-                          <span className="menu-icon">{menuIcons["Site Settings"]}</span>
-                          Site Settings
-                        </button>
-                        <button className={activeView === "FAQs" ? "active" : ""} type="button" onClick={() => openAdminView("FAQs")}>
-                          <span className="menu-icon">{menuIcons.FAQ}</span>
-                          FAQ
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
+                  <>
+                    <div className={`sidebar-group ${activeView === "General" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "FAQs" ? "active" : ""}`}>
+                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
+                        <span className="menu-icon">{menuIcons.General}</span>
+                        General
+                        <span className="sidebar-chevron">{isGeneralMenuOpen ? "⌄" : "›"}</span>
+                      </button>
+                      {isGeneralMenuOpen ? (
+                        <div className="sidebar-submenu">
+                          <button className={activeView === "General" ? "active" : ""} type="button" onClick={() => openAdminView("General")}>
+                            <span className="menu-icon">{menuIcons["Site Settings"]}</span>
+                            Site Settings
+                          </button>
+                          <button className={activeView === "Homepage Themes" ? "active" : ""} type="button" onClick={() => openAdminView("Homepage Themes")}>
+                            <span className="menu-icon">{menuIcons["Homepage Themes"]}</span>
+                            Homepage Themes
+                          </button>
+                          <button className={activeView === "Legal Center" ? "active" : ""} type="button" onClick={() => openAdminView("Legal Center")}>
+                            <span className="menu-icon">{menuIcons["Legal Center"]}</span>
+                            Legal Center
+                          </button>
+                          <button className={activeView === "Notifications" ? "active" : ""} type="button" onClick={() => openAdminView("Notifications")}>
+                            <span className="menu-icon">{menuIcons.Notifications}</span>
+                            Notifications
+                          </button>
+                          <button className={activeView === "FAQs" ? "active" : ""} type="button" onClick={() => openAdminView("FAQs")}>
+                            <span className="menu-icon">{menuIcons.FAQ}</span>
+                            FAQ
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className={`sidebar-group ${activeView === "Users" ? "active" : ""}`}>
+                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsUserManagementMenuOpen((current) => !current)}>
+                        <span className="menu-icon">{menuIcons.Users}</span>
+                        User management
+                        <span className="sidebar-chevron">{isUserManagementMenuOpen ? "⌄" : "›"}</span>
+                      </button>
+                      {isUserManagementMenuOpen ? (
+                        <div className="sidebar-submenu">
+                          <button className={activeView === "Users" ? "active" : ""} type="button" onClick={() => openAdminView("Users")}>
+                            <span className="menu-icon">{menuIcons.Users}</span>
+                            Users
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className={`sidebar-group ${activeView === "Subscriptions" ? "active" : ""}`}>
+                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsSubscriptionsMenuOpen((current) => !current)}>
+                        <span className="menu-icon">{menuIcons.Subscriptions}</span>
+                        Subscriptions
+                        <span className="sidebar-chevron">{isSubscriptionsMenuOpen ? "⌄" : "›"}</span>
+                      </button>
+                      {isSubscriptionsMenuOpen ? (
+                        <div className="sidebar-submenu">
+                          <button className={activeView === "Subscriptions" ? "active" : ""} type="button" onClick={() => openAdminView("Subscriptions")}>
+                            <span className="menu-icon">{menuIcons.Subscriptions}</span>
+                            Subscriptions
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className={`sidebar-group ${activeView === "Plans & Benefits" ? "active" : ""}`}>
+                      <button className="sidebar-group-toggle" type="button" onClick={() => setIsPlansBenefitsMenuOpen((current) => !current)}>
+                        <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
+                        Plans & Benefits
+                        <span className="sidebar-chevron">{isPlansBenefitsMenuOpen ? "⌄" : "›"}</span>
+                      </button>
+                      {isPlansBenefitsMenuOpen ? (
+                        <div className="sidebar-submenu">
+                          <button disabled type="button">
+                            <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
+                            Basic plan
+                          </button>
+                          <button className={activeView === "Plans & Benefits" && plansBenefitsTab === "repair" ? "active" : ""} type="button" onClick={() => openPlansBenefitsTab("repair")}>
+                            <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
+                            Repair service
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
                 ) : null}
               </Fragment>
             ))}
@@ -1842,14 +3142,211 @@ export default function Home() {
                     />
                   </label> */}
                   <div className="general-actions">
-                    <button disabled={isGeneralLoading} type="button" onClick={loadGeneralSettings}>
-                      Refresh
-                    </button>
                     <button disabled={isGeneralLoading || isGeneralSaving} type="submit">
                       {isGeneralSaving ? "Saving..." : "Save Changes"}
                     </button>
                   </div>
                 </form>
+              </>
+            ) : activeView === "Homepage Themes" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Homepage Themes</h2>
+                    <p>Update homepage theme images</p>
+                  </div>
+                  <span>{homepageThemes.length} themes</span>
+                </section>
+
+                {homepageThemesError ? <p className="dashboard-error">{homepageThemesError}</p> : null}
+
+                <section className="homepage-themes-panel panel">
+                  <div className="homepage-themes-actions">
+                    <button type="button" onClick={() => openHomepageThemeModal()}>
+                      <ActionIcon type="add" />
+                      Add
+                    </button>
+                  </div>
+
+                  {isHomepageThemesLoading ? <p className="dashboard-error">Loading homepage themes...</p> : null}
+
+                  {!isHomepageThemesLoading && !homepageThemes.length ? (
+                    <div className="empty-state compact">
+                      <img src="/no-records.svg" alt="No records found" />
+                      <strong>No homepage themes found</strong>
+                    </div>
+                  ) : null}
+
+                  <div className="homepage-theme-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Image Name</th>
+                          <th>Prev Image URL</th>
+                          <th>Preview</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {homepageThemes.map((theme, themeIndex) => {
+                          const imageUrl = getHomepageThemeImageUrl(theme.fileName);
+
+                          return (
+                            <tr key={`${theme.imageName}-${themeIndex}`}>
+                              <td>{theme.imageName}</td>
+                              <td>
+                                <span>{imageUrl || "-"}</span>
+                              </td>
+                              <td>
+                                {imageUrl ? <img src={imageUrl} alt={theme.imageName || "Homepage theme"} /> : "-"}
+                              </td>
+                              <td>
+                                <div className="homepage-theme-row-actions">
+                                  <button type="button" onClick={() => openHomepageThemeModal(theme)}>
+                                    <ActionIcon type="edit" />
+                                    Update
+                                  </button>
+                                  <button type="button" onClick={() => openDeleteHomepageThemeModal(theme)}>
+                                    <ActionIcon type="delete" />
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </>
+            ) : activeView === "Legal Center" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Legal Center</h2>
+                    <p>Manage terms, privacy policy, and consent content</p>
+                  </div>
+                  {legalContent.updatedAt ? <span>Updated {new Date(legalContent.updatedAt).toLocaleDateString()}</span> : null}
+                </section>
+
+                {legalContentError ? <p className="dashboard-error">{legalContentError}</p> : null}
+                {isLegalContentLoading ? <p className="dashboard-error">Loading legal content...</p> : null}
+
+                <form className="legal-editor-panel panel" onSubmit={updateLegalContent}>
+                  <div className="legal-panel-heading">
+                    <span>Editor</span>
+                    <strong>Content Editor</strong>
+                  </div>
+                  <HtmlEditor
+                    label="Terms and Conditions"
+                    value={legalContent.termsAndConditions}
+                    onChange={(value) => setLegalContent((content) => ({ ...content, termsAndConditions: value }))}
+                  />
+                  <HtmlEditor
+                    label="Privacy Policy"
+                    value={legalContent.privacyPolicy}
+                    onChange={(value) => setLegalContent((content) => ({ ...content, privacyPolicy: value }))}
+                  />
+                  <HtmlEditor
+                    label="Consent"
+                    value={legalContent.consent}
+                    onChange={(value) => setLegalContent((content) => ({ ...content, consent: value }))}
+                  />
+                  <div className="general-actions">
+                    <button disabled={isLegalContentLoading || isLegalContentSaving} type="submit">
+                      {isLegalContentSaving ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : activeView === "Notifications" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Notifications</h2>
+                    <p>Send app notifications to all users or selected users</p>
+                  </div>
+                  <span>{selectedNotificationUserIds.length} selected</span>
+                </section>
+
+                {notificationsError ? <p className="dashboard-error">{notificationsError}</p> : null}
+
+                <div className="section-tabs">
+                  <button
+                    className={notificationsTab === "notifications" ? "active" : ""}
+                    type="button"
+                    onClick={() => setNotificationsTab("notifications")}
+                  >
+                    Notifications
+                  </button>
+                  <button
+                    className={notificationsTab === "users" ? "active" : ""}
+                    type="button"
+                    onClick={() => setNotificationsTab("users")}
+                  >
+                    Users
+                  </button>
+                </div>
+
+                {notificationsTab === "notifications" ? (
+                  <>
+                    <div className="plans-toolbar">
+                      <button type="button" onClick={() => openNotificationModal("all")}>
+                        Send to all users
+                      </button>
+                    </div>
+
+                    <CommonTable
+                      columns={notificationColumns}
+                      emptyText="No notifications found"
+                      pagination={
+                        notificationsData?.pagination
+                          ? {
+                            page: notificationsData.pagination.page,
+                            totalPages: notificationsData.pagination.totalPages,
+                            onPrevious: () => loadAdminNotifications(notificationsData.pagination.page - 1),
+                            onNext: () => loadAdminNotifications(notificationsData.pagination.page + 1),
+                          }
+                          : undefined
+                      }
+                      rows={notificationRows}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <section className="table-toolbar feedback-toolbar">
+                      <input
+                        placeholder="Search users..."
+                        value={notificationUserSearch}
+                        onChange={(event) => setNotificationUserSearch(event.target.value)}
+                      />
+                      <button type="button" onClick={() => loadNotificationUsers(1)}>
+                        Search
+                      </button>
+                      <button type="button" onClick={() => openNotificationModal("users")}>
+                        Send Selected
+                      </button>
+                    </section>
+
+                    <CommonTable
+                      columns={notificationUserColumns}
+                      emptyText={isNotificationsLoading ? "Loading users..." : "No users found"}
+                      isLoading={isNotificationsLoading}
+                      pagination={
+                        notificationUsersData?.pagination
+                          ? {
+                            page: notificationUsersData.pagination.page,
+                            totalPages: notificationUsersData.pagination.totalPages,
+                            onPrevious: () => loadNotificationUsers(notificationUsersData.pagination.page - 1),
+                            onNext: () => loadNotificationUsers(notificationUsersData.pagination.page + 1),
+                          }
+                          : undefined
+                      }
+                      rows={notificationUserRows}
+                    />
+                  </>
+                )}
               </>
             ) : activeView === "FAQs" ? (
               <>
@@ -1865,10 +3362,8 @@ export default function Home() {
 
                 <form className="faqs-form" onSubmit={updateFaqs}>
                   <div className="faq-page-actions">
-                    <button disabled={isFaqsLoading} type="button" onClick={loadFaqs}>
-                      Refresh
-                    </button>
                     <button type="button" onClick={addFaqCategory}>
+                      <ActionIcon type="add" />
                       Add Category
                     </button>
                     <button disabled={isFaqsLoading || isFaqsSaving} type="submit">
@@ -1893,6 +3388,7 @@ export default function Home() {
                           <p>{category.questions.length} FAQs</p>
                         </div>
                         <button type="button" onClick={() => removeFaqCategory(categoryIndex)}>
+                          <ActionIcon type="delete" />
                           Remove Category
                         </button>
                       </div>
@@ -1932,6 +3428,7 @@ export default function Home() {
                           <div className="faq-question-header">
                             <strong>FAQ {questionIndex + 1}</strong>
                             <button type="button" onClick={() => removeFaqQuestion(categoryIndex, questionIndex)}>
+                              <ActionIcon type="delete" />
                               Remove
                             </button>
                           </div>
@@ -1975,6 +3472,7 @@ export default function Home() {
                       ))}
 
                       <button className="faq-add-question" type="button" onClick={() => addFaqQuestion(categoryIndex)}>
+                        <ActionIcon type="add" />
                         Add FAQ
                       </button>
                     </section>
@@ -1988,29 +3486,57 @@ export default function Home() {
                     <h2>Plans & Benefits</h2>
                     <p>Manage subscription plans, features, and benefits</p>
                   </div>
-                  <span>{adminPlans.length} plans</span>
+                  <span>
+                    {plansBenefitsTab === "repair"
+                      ? cibilRepairTab === "plans"
+                        ? `${cibilRepairContent.plans.length} repair plans`
+                        : `${cibilRepairContent.timelines.length} timelines`
+                      : `${adminPlans.length} plans`}
+                  </span>
                 </section>
 
                 <div className="section-tabs">
-                  <button
-                    className={plansBenefitsTab === "plans" ? "active" : ""}
-                    type="button"
-                    onClick={() => setPlansBenefitsTab("plans")}
-                  >
-                    Plans
-                  </button>
-                  <button
-                    className={plansBenefitsTab === "benefits" ? "active" : ""}
-                    type="button"
-                    onClick={() => setPlansBenefitsTab("benefits")}
-                  >
-                    Benefits
-                  </button>
+                  {plansBenefitsTab === "repair" ? (
+                    <>
+                      <button
+                        className={cibilRepairTab === "plans" ? "active" : ""}
+                        type="button"
+                        onClick={() => setCibilRepairTab("plans")}
+                      >
+                        Plans
+                      </button>
+                      <button
+                        className={cibilRepairTab === "timelines" ? "active" : ""}
+                        type="button"
+                        onClick={() => setCibilRepairTab("timelines")}
+                      >
+                        Timelines
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className={plansBenefitsTab === "plans" ? "active" : ""}
+                        type="button"
+                        onClick={() => setPlansBenefitsTab("plans")}
+                      >
+                        Plans
+                      </button>
+                      <button
+                        className={plansBenefitsTab === "benefits" ? "active" : ""}
+                        type="button"
+                        onClick={() => setPlansBenefitsTab("benefits")}
+                      >
+                        Benefits
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {adminPlansError ? <p className="dashboard-error">{adminPlansError}</p> : null}
+                {cibilRepairError ? <p className="dashboard-error">{cibilRepairError}</p> : null}
 
-                {!isAdminPlansLoading && !adminPlans.length ? (
+                {plansBenefitsTab !== "repair" && !isAdminPlansLoading && !adminPlans.length ? (
                   <div className="empty-state panel">
                     <img src="/no-records.svg" alt="No records found" />
                     <strong>No records found</strong>
@@ -2028,10 +3554,8 @@ export default function Home() {
                           setIsAdminPlanModalOpen(true);
                         }}
                       >
+                        <ActionIcon type="add" />
                         Add Plan
-                      </button>
-                      <button disabled={isAdminPlansLoading} type="button" onClick={loadAdminPlans}>
-                        Refresh
                       </button>
                     </div>
 
@@ -2056,6 +3580,7 @@ export default function Home() {
                           <em className={plan.isActive === false ? "inactive" : ""}>{plan.isActive === false ? "Inactive" : "Active"}</em>
                           <div className="table-actions">
                             <button className="table-action" type="button" onClick={() => editAdminPlan(plan)}>
+                              <ActionIcon type="edit" />
                               Edit
                             </button>
                             <button className="table-action" disabled={plan.isActive === false || isAdminPlanSaving} type="button" onClick={() => inactiveAdminPlan(plan)}>
@@ -2066,6 +3591,93 @@ export default function Home() {
                       ))}
                     </section>
                   </>
+                ) : plansBenefitsTab === "repair" ? (
+                  <form className="admin-plan-form panel" onSubmit={saveCibilRepairContent}>
+                    <div className="admin-plan-form-header">
+                      <h3>{cibilRepairTab === "plans" ? "Repair Plans" : "Timelines"}</h3>
+                      <button type="button" onClick={cibilRepairTab === "plans" ? addCibilRepairPlan : addCibilRepairTimeline}>
+                        <ActionIcon type="add" />
+                        {cibilRepairTab === "plans" ? "Add Plan" : "Add Timeline"}
+                      </button>
+                    </div>
+
+                    {isCibilRepairLoading ? (
+                      <div className="plan-loading">
+                        <span className="table-loader" />
+                        Loading repair content...
+                      </div>
+                    ) : (
+                      <>
+                        {cibilRepairTab === "plans" ? (
+                          cibilRepairContent.plans.map((plan, index) => (
+                            <section className="repair-content-card" key={`${plan.publicId}-${index}`}>
+                              <div className="admin-plan-grid">
+                                <label>
+                                  Public ID
+                                  <input required value={plan.publicId} onChange={(event) => updateCibilRepairPlan(index, "publicId", event.target.value)} />
+                                </label>
+                                <label>
+                                  Plan Name
+                                  <input required value={plan.planName} onChange={(event) => updateCibilRepairPlan(index, "planName", event.target.value)} />
+                                </label>
+                                <label>
+                                  Amount
+                                  <input required min={0} type="number" value={plan.amount} onChange={(event) => updateCibilRepairPlan(index, "amount", event.target.value)} />
+                                </label>
+                                <label>
+                                  GST Percentage
+                                  <input required min={0} type="number" value={plan.gstPercentage} onChange={(event) => updateCibilRepairPlan(index, "gstPercentage", event.target.value)} />
+                                </label>
+                                <label>
+                                  Offer Tag
+                                  <input value={plan.offerTag} onChange={(event) => updateCibilRepairPlan(index, "offerTag", event.target.value)} />
+                                </label>
+                              </div>
+                            </section>
+                          ))
+                        ) : (
+                          cibilRepairContent.timelines.map((timeline, index) => (
+                            <section
+                              className="repair-content-card"
+                              key={timeline.publicId || timeline.localId || `timeline-${index}`}
+                              ref={index === cibilRepairContent.timelines.length - 1 ? newCibilRepairTimelineRef : null}
+                            >
+                              <div className="admin-plan-grid">
+                                <label>
+                                  Display Order
+                                  <input required min={1} type="number" value={timeline.displayOrder} onChange={(event) => updateCibilRepairTimeline(index, "displayOrder", event.target.value)} />
+                                </label>
+                                <label>
+                                  Title
+                                  <input required value={timeline.title} onChange={(event) => updateCibilRepairTimeline(index, "title", event.target.value)} />
+                                </label>
+                              </div>
+                              <label>
+                                Description
+                                <textarea required value={timeline.description} onChange={(event) => updateCibilRepairTimeline(index, "description", event.target.value)} />
+                              </label>
+                              <div className="repair-content-footer">
+                                <label className="faq-checkbox admin-plan-active">
+                                  <input checked={timeline.isActive} type="checkbox" onChange={(event) => updateCibilRepairTimeline(index, "isActive", event.target.checked)} />
+                                  Active
+                                </label>
+                                <button className="table-action danger-action" disabled={isCibilRepairSaving} type="button" onClick={() => setDeletingCibilRepairTimelineIndex(index)}>
+                                  <ActionIcon type="delete" />
+                                  Remove
+                                </button>
+                              </div>
+                            </section>
+                          ))
+                        )}
+                      </>
+                    )}
+
+                    <footer className="modal-actions">
+                      <button disabled={isCibilRepairSaving || isCibilRepairLoading} type="submit">
+                        {isCibilRepairSaving ? "Saving..." : cibilRepairTab === "timelines" ? "Save Timelines" : "Save Repair Content"}
+                      </button>
+                    </footer>
+                  </form>
                 ) : (
                   <section className="benefits-list">
                     {adminPlans.map((plan) => (
@@ -2109,16 +3721,8 @@ export default function Home() {
                     value={feedbackSearch}
                     onChange={(event) => setFeedbackSearch(event.target.value)}
                   />
-                  <input
-                    type="date"
-                    value={feedbackFromDate}
-                    onChange={(event) => setFeedbackFromDate(event.target.value)}
-                  />
-                  <input
-                    type="date"
-                    value={feedbackToDate}
-                    onChange={(event) => setFeedbackToDate(event.target.value)}
-                  />
+                  <DateFilter label="Start date" value={feedbackFromDate} onChange={setFeedbackFromDate} />
+                  <DateFilter label="End date" value={feedbackToDate} onChange={setFeedbackToDate} />
                   <button className="icon-button" title="Reset filters" type="button" onClick={resetFeedbackFilters}>
                     ↻
                   </button>
@@ -2136,14 +3740,65 @@ export default function Home() {
                   pagination={
                     feedbackData?.pagination
                       ? {
-                          page: feedbackData.pagination.page,
-                          totalPages: feedbackData.pagination.totalPages,
-                          onPrevious: () => loadFeedback(feedbackData.pagination!.page - 1),
-                          onNext: () => loadFeedback(feedbackData.pagination!.page + 1),
-                        }
+                        page: feedbackData.pagination.page,
+                        totalPages: feedbackData.pagination.totalPages,
+                        onPrevious: () => loadFeedback(feedbackData.pagination!.page - 1),
+                        onNext: () => loadFeedback(feedbackData.pagination!.page + 1),
+                      }
                       : undefined
                   }
                   rows={feedbackRows}
+                />
+              </>
+            ) : activeView === "Contact Us" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Contact Us</h2>
+                    <p>Review contact requests</p>
+                  </div>
+                  <span>{contactRequestsData?.pagination.total ?? 0} records</span>
+                </section>
+
+                <div className="mobile-toolbar-actions single">
+                  <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>
+                    Filter
+                  </button>
+                </div>
+
+                <section className={`table-toolbar feedback-toolbar ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
+                  <input
+                    placeholder="Search contact requests..."
+                    value={contactSearch}
+                    onChange={(event) => setContactSearch(event.target.value)}
+                  />
+                  <DateFilter label="Start date" value={contactFromDate} onChange={setContactFromDate} />
+                  <DateFilter label="End date" value={contactToDate} onChange={setContactToDate} />
+                  <button className="icon-button" title="Reset filters" type="button" onClick={resetContactFilters}>
+                    ↻
+                  </button>
+                  <button type="button" onClick={() => loadContactRequests(1)}>
+                    Search
+                  </button>
+                </section>
+
+                {contactError ? <p className="dashboard-error">{contactError}</p> : null}
+
+                <CommonTable
+                  columns={contactColumns}
+                  emptyText={isContactLoading ? "Loading contact requests..." : "No contact requests found"}
+                  isLoading={isContactLoading}
+                  pagination={
+                    contactRequestsData?.pagination
+                      ? {
+                        page: contactRequestsData.pagination.page,
+                        totalPages: contactRequestsData.pagination.totalPages,
+                        onPrevious: () => loadContactRequests(contactRequestsData.pagination.page - 1),
+                        onNext: () => loadContactRequests(contactRequestsData.pagination.page + 1),
+                      }
+                      : undefined
+                  }
+                  rows={contactRows}
                 />
               </>
             ) : activeView === "Users" ? (
@@ -2171,16 +3826,8 @@ export default function Home() {
                     value={usersSearch}
                     onChange={(event) => setUsersSearch(event.target.value)}
                   />
-                  <input
-                    type="date"
-                    value={usersFromDate}
-                    onChange={(event) => setUsersFromDate(event.target.value)}
-                  />
-                  <input
-                    type="date"
-                    value={usersToDate}
-                    onChange={(event) => setUsersToDate(event.target.value)}
-                  />
+                  <DateFilter label="Start date" value={usersFromDate} onChange={setUsersFromDate} />
+                  <DateFilter label="End date" value={usersToDate} onChange={setUsersToDate} />
                   <button className="icon-button" title="Reset filters" type="button" onClick={resetUsersFilters}>
                     ↻
                   </button>
@@ -2201,11 +3848,11 @@ export default function Home() {
                   pagination={
                     usersData
                       ? {
-                          page: usersData.pagination.page,
-                          totalPages: usersData.pagination.totalPages,
-                          onPrevious: () => loadUsers(usersData.pagination.page - 1),
-                          onNext: () => loadUsers(usersData.pagination.page + 1),
-                        }
+                        page: usersData.pagination.page,
+                        totalPages: usersData.pagination.totalPages,
+                        onPrevious: () => loadUsers(usersData.pagination.page - 1),
+                        onNext: () => loadUsers(usersData.pagination.page + 1),
+                      }
                       : undefined
                   }
                   rows={usersRows}
@@ -2236,16 +3883,8 @@ export default function Home() {
                     value={usersSearch}
                     onChange={(event) => setUsersSearch(event.target.value)}
                   />
-                  <input
-                    type="date"
-                    value={usersFromDate}
-                    onChange={(event) => setUsersFromDate(event.target.value)}
-                  />
-                  <input
-                    type="date"
-                    value={usersToDate}
-                    onChange={(event) => setUsersToDate(event.target.value)}
-                  />
+                  <DateFilter label="Start date" value={usersFromDate} onChange={setUsersFromDate} />
+                  <DateFilter label="End date" value={usersToDate} onChange={setUsersToDate} />
                   <button className="icon-button" title="Reset filters" type="button" onClick={resetUsersFilters}>
                     ↻
                   </button>
@@ -2319,21 +3958,21 @@ export default function Home() {
                   pagination={
                     loansData
                       ? {
-                          page: loansData.pagination.page,
-                          totalPages: loansData.pagination.totalPages,
-                          onPrevious: () => loadLoans(loansData.pagination.page - 1),
-                          onNext: () => loadLoans(loansData.pagination.page + 1),
-                        }
+                        page: loansData.pagination.page,
+                        totalPages: loansData.pagination.totalPages,
+                        onPrevious: () => loadLoans(loansData.pagination.page - 1),
+                        onNext: () => loadLoans(loansData.pagination.page + 1),
+                      }
                       : undefined
                   }
                   rows={loanRows}
                 />
               </>
-            ) : activeView === "Chat" ? (
+            ) : activeView === "Chats" ? (
               <>
                 <section className="welcome-panel">
                   <div>
-                    <h2>Chat</h2>
+                    <h2>Chats</h2>
                     <p>Review recent user chat messages</p>
                   </div>
                   <span>{chatsData?.pagination.total ?? 0} questions</span>
@@ -2368,11 +4007,11 @@ export default function Home() {
                   pagination={
                     chatsData
                       ? {
-                          page: chatsData.pagination.page,
-                          totalPages: chatsData.pagination.totalPages,
-                          onPrevious: () => loadChats(chatsData.pagination.page - 1),
-                          onNext: () => loadChats(chatsData.pagination.page + 1),
-                        }
+                        page: chatsData.pagination.page,
+                        totalPages: chatsData.pagination.totalPages,
+                        onPrevious: () => loadChats(chatsData.pagination.page - 1),
+                        onNext: () => loadChats(chatsData.pagination.page + 1),
+                      }
                       : undefined
                   }
                   rows={chatRows}
@@ -2380,139 +4019,287 @@ export default function Home() {
               </>
             ) : (
               <>
-            <section className="welcome-panel">
-              <div>
-                <h2>Welcome back, {adminUser?.fullName || "Admin"}</h2>
-                <p>Here is what is happening with ScoreCare today.</p>
-              </div>
-              <span>Jun 10, 2026 14:45:59</span>
-            </section>
-
-            <section className="stats-grid">
-              {statCards.map((card) => (
-                <article className="stat-card" key={card.label}>
-                  <span className={`stat-icon ${card.tone}`}>▣</span>
+                <section className="welcome-panel">
                   <div>
-                    <strong>{card.value}</strong>
-                    <p>{card.label}</p>
+                    <h2>Welcome back, {adminUser?.fullName || "Admin"}</h2>
+                    <p>Here is what is happening with ScoreCare today.</p>
                   </div>
-                  <em>{card.meta}</em>
-                </article>
-              ))}
-            </section>
-            {dashboardError ? <p className="dashboard-error">{dashboardError}</p> : null}
+                  <span>Jun 10, 2026 14:45:59</span>
+                </section>
 
-            <section className="dashboard-grid">
-              <article className="panel revenue-panel">
-                <div className="panel-header">
-                  <h3>Monthly Records</h3>
-                  <div className="tabs">
-                    <button type="button">Users</button>
-                    <button type="button">Messages</button>
-                    <button type="button">Loans</button>
-                  </div>
-                </div>
-                <div className="chart">
-                  {monthlyRecords.map((record) => (
-                    <div className="chart-month" key={record.label}>
+                <section className="stats-grid">
+                  {statCards.map((card) => (
+                    <article className="stat-card" key={card.label}>
+                      <span className={`stat-icon ${card.tone}`}>▣</span>
                       <div>
-                        <span className="revenue-bar" style={{ height: `${(record.users / maxMonthlyValue) * 100}%` }} />
-                        <span className="expense-bar" style={{ height: `${(record.messages / maxMonthlyValue) * 100}%` }} />
-                        <span className="loan-bar" style={{ height: `${(record.loans / maxMonthlyValue) * 100}%` }} />
+                        <strong>{card.value}</strong>
+                        <p>{card.label}</p>
                       </div>
-                      <small>{record.label.slice(5)}</small>
+                      <em>{card.meta}</em>
+                    </article>
+                  ))}
+                </section>
+                {dashboardError ? <p className="dashboard-error">{dashboardError}</p> : null}
+
+                <section className="dashboard-grid">
+                  <article className="panel revenue-panel">
+                    <div className="panel-header">
+                      <h3>Monthly Records</h3>
+                      <div className="tabs">
+                        <button type="button">Users</button>
+                        <button type="button">Messages</button>
+                        <button type="button">Loans</button>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="panel traffic-panel">
-                <h3>Users By Access Type</h3>
-                <div className="donut" style={{ background: `conic-gradient(${donutGradient || "#e5e7eb 0 100%"})` }}>
-                  <span>Total<br /><strong>{dashboardCounts?.totalUsers ?? 0}</strong></span>
-                </div>
-                <ul>
-                  {accessTypeGraph.map((item, index) => (
-                    <li key={item.label}>
-                      <span className={`dot ${["blue", "green", "yellow", "teal"][index]}`} />
-                      {item.label}
-                      <strong>{item.percentage}%</strong>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            </section>
-
-            <section className="dashboard-grid bottom-grid">
-              <article className="panel orders-panel">
-                <div className="panel-header">
-                  <h3>Recent Subscriptions</h3>
-                  <button type="button">View All</button>
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Count</th>
-                      <th>Type</th>
-                      <th>Amount</th>
-                      <th>Percentage</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dashboardCounts?.graphs.subscriptionsByStatus.map((item) => (
-                      <tr key={item.label}>
-                        <td>{item.label}</td>
-                        <td>{item.count}</td>
-                        <td>Subscription</td>
-                        <td>₹{dashboardCounts.amount}</td>
-                        <td><span>{item.percentage}%</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </article>
-
-              <article className="panel activity-panel">
-                <h3>Loan Status</h3>
-                <p>Applied loans: {dashboardCounts?.loans.applied ?? 0}</p>
-                <p>Approved loans: {dashboardCounts?.loans.approved ?? 0}</p>
-                <p>Rejected loans: {dashboardCounts?.loans.rejected ?? 0}</p>
-                <p>Pending loans: {dashboardCounts?.loans.pending ?? 0}</p>
-              </article>
-            </section>
-
-            <section className="dashboard-grid feedback-dashboard-grid">
-              <article className="panel feedback-analytics-panel">
-                <div className="panel-header">
-                  <h3>Feedback Analytics</h3>
-                  <span>{dashboardCounts?.totalFeedback ?? 0} total</span>
-                </div>
-                <div className="feedback-rating-list">
-                  {feedbackRatingGraph.length ? (
-                    feedbackRatingGraph.map((item) => (
-                      <div className="feedback-rating-row" key={item.label}>
-                        <span>{item.label} ★</span>
-                        <div>
-                          <i style={{ width: `${item.percentage}%` }} />
+                    <div className="chart">
+                      {monthlyRecords.map((record) => (
+                        <div className="chart-month" key={record.label}>
+                          <div>
+                            <span className="revenue-bar" style={{ height: `${(record.users / maxMonthlyValue) * 100}%` }} />
+                            <span className="expense-bar" style={{ height: `${(record.messages / maxMonthlyValue) * 100}%` }} />
+                            <span className="loan-bar" style={{ height: `${(record.loans / maxMonthlyValue) * 100}%` }} />
+                          </div>
+                          <small>{record.label.slice(5)}</small>
                         </div>
-                        <strong>{item.count}</strong>
-                        <em>{item.percentage}%</em>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="empty-state compact">
-                      <img src="/no-records.svg" alt="No records found" />
-                      <strong>No feedback analytics found</strong>
+                      ))}
                     </div>
-                  )}
-                </div>
-              </article>
-            </section>
+                  </article>
+
+                  <article className="panel traffic-panel">
+                    <h3>Users By Access Type</h3>
+                    <div className="donut" style={{ background: `conic-gradient(${donutGradient || "#e5e7eb 0 100%"})` }}>
+                      <span>Total<br /><strong>{dashboardCounts?.totalUsers ?? 0}</strong></span>
+                    </div>
+                    <ul>
+                      {accessTypeGraph.map((item, index) => (
+                        <li key={item.label}>
+                          <span className={`dot ${["blue", "green", "yellow", "teal"][index]}`} />
+                          {item.label}
+                          <strong>{item.percentage}%</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                </section>
+
+                <section className="dashboard-grid bottom-grid">
+                  <article className="panel orders-panel">
+                    <div className="panel-header">
+                      <h3>Recent Subscriptions</h3>
+                      <button type="button">View All</button>
+                    </div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Status</th>
+                          <th>Count</th>
+                          <th>Type</th>
+                          <th>Amount</th>
+                          <th>Percentage</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dashboardCounts?.graphs.subscriptionsByStatus.map((item) => (
+                          <tr key={item.label}>
+                            <td>{item.label}</td>
+                            <td>{item.count}</td>
+                            <td>Subscription</td>
+                            <td>₹{dashboardCounts.amount}</td>
+                            <td><span>{item.percentage}%</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </article>
+
+                  <article className="panel activity-panel">
+                    <h3>Loan Status</h3>
+                    <p>Applied loans: {dashboardCounts?.loans.applied ?? 0}</p>
+                    <p>Approved loans: {dashboardCounts?.loans.approved ?? 0}</p>
+                    <p>Rejected loans: {dashboardCounts?.loans.rejected ?? 0}</p>
+                    <p>Pending loans: {dashboardCounts?.loans.pending ?? 0}</p>
+                  </article>
+                </section>
+
+                <section className="dashboard-grid feedback-dashboard-grid">
+                  <article className="panel feedback-analytics-panel">
+                    <div className="panel-header">
+                      <h3>Feedback Analytics</h3>
+                      <span>{dashboardCounts?.totalFeedback ?? 0} total</span>
+                    </div>
+                    <div className="feedback-rating-list">
+                      {feedbackRatingGraph.length ? (
+                        feedbackRatingGraph.map((item) => (
+                          <div className="feedback-rating-row" key={item.label}>
+                            <span>{item.label} ★</span>
+                            <div>
+                              <i style={{ width: `${item.percentage}%` }} />
+                            </div>
+                            <strong>{item.count}</strong>
+                            <em>{item.percentage}%</em>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="empty-state compact">
+                          <img src="/no-records.svg" alt="No records found" />
+                          <strong>No feedback analytics found</strong>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                </section>
               </>
             )}
           </div>
         </section>
+        {isHomepageThemeModalOpen ? (
+          <div className="modal-backdrop">
+            <section className="plan-modal homepage-theme-modal">
+              <header>
+                <div>
+                  <h3>{homepageThemeForm.originalImageName ? "Update Theme" : "Add Theme"}</h3>
+                  {/* <p>Homepage Themes</p> */}
+                </div>
+                <button type="button" onClick={closeHomepageThemeModal}>
+                  ×
+                </button>
+              </header>
+
+              <form className="homepage-theme-form" onSubmit={saveHomepageTheme}>
+                <label>
+                  Image Name
+                  <input
+                    required
+                    value={homepageThemeForm.imageName}
+                    onChange={(event) => setHomepageThemeForm((theme) => ({ ...theme, imageName: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Image
+                  <input
+                    accept="image/*"
+                    type="file"
+                    onChange={(event) => setHomepageThemeForm((theme) => ({ ...theme, image: event.target.files?.[0] || null }))}
+                  />
+                </label>
+                <label className="faq-checkbox">
+                  Active
+                  <input
+                    checked={homepageThemeForm.isActive}
+                    type="checkbox"
+                    onChange={(event) => setHomepageThemeForm((theme) => ({ ...theme, isActive: event.target.checked }))}
+                  />
+                </label>
+                <footer className="modal-actions">
+                  <button type="button" onClick={closeHomepageThemeModal}>
+                    Cancel
+                  </button>
+                  <button disabled={savingHomepageTheme === homepageThemeForm.imageName} type="submit">
+                    {savingHomepageTheme === homepageThemeForm.imageName ? (
+                      "Saving..."
+                    ) : (
+                      <>
+                        <ActionIcon type={homepageThemeForm.originalImageName ? "edit" : "add"} />
+                        {homepageThemeForm.originalImageName ? "Update" : "Add"}
+                      </>
+                    )}
+                  </button>
+                </footer>
+              </form>
+            </section>
+          </div>
+        ) : null}
+        {deletingHomepageTheme ? (
+          <div className="modal-backdrop">
+
+            <section className="plan-modal confirm-delete-modal">
+              <p>Are you sure want to delete?</p>
+
+              <footer className="modal-actions">
+                <button
+                  disabled={isDeletingHomepageTheme}
+                  type="button"
+                  onClick={closeDeleteHomepageThemeModal}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="danger-action"
+                  disabled={isDeletingHomepageTheme}
+                  type="button"
+                  onClick={deleteHomepageTheme}
+                >
+                  {isDeletingHomepageTheme ? "Deleting..." : "Delete"}
+                </button>
+              </footer>
+            </section>
+
+          </div>
+        ) : null}
+        {deletingCibilRepairTimelineIndex !== null ? (
+          <div className="modal-backdrop">
+            <section className="plan-modal confirm-delete-modal">
+              <h4>Are you sure want to delete?</h4>
+
+              <footer className="modal-actions">
+                <button
+                  disabled={isCibilRepairSaving}
+                  type="button"
+                  onClick={() => setDeletingCibilRepairTimelineIndex(null)}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="danger-action"
+                  disabled={isCibilRepairSaving}
+                  type="button"
+                  onClick={() => removeCibilRepairTimeline(deletingCibilRepairTimelineIndex)}
+                >
+                  {isCibilRepairSaving ? "Deleting..." : "Delete"}
+                </button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
+        {isNotificationModalOpen ? (
+          <div className="modal-backdrop">
+            <section className="plan-modal admin-plan-modal notification-modal">
+              <header>
+                <div>
+                  <h3>{notificationModalScope === "all" ? "Send to all users" : "Send notification"}</h3>
+                  <p>{notificationModalScope === "users" ? `${selectedNotificationUserIds.length} selected` : "All active users"}</p>
+                </div>
+                <button type="button" onClick={closeNotificationModal}>
+                  ×
+                </button>
+              </header>
+
+              <form className="general-form modal-plan-form" onSubmit={(event) => {
+                event.preventDefault();
+                sendAdminNotification(notificationModalScope);
+              }}>
+                <label>
+                  Title
+                  <input required value={notificationTitle} onChange={(event) => setNotificationTitle(event.target.value)} />
+                </label>
+                <label>
+                  Message
+                  <textarea required value={notificationMessage} onChange={(event) => setNotificationMessage(event.target.value)} />
+                </label>
+                <footer className="modal-actions">
+                  <button disabled={isNotificationSending} type="button" onClick={closeNotificationModal}>
+                    Cancel
+                  </button>
+                  <button disabled={isNotificationSending || !notificationTitle || !notificationMessage} type="submit">
+                    {isNotificationSending ? "Sending..." : "Send"}
+                  </button>
+                </footer>
+              </form>
+            </section>
+          </div>
+        ) : null}
         {isAdminPlanModalOpen ? (
           <div className="modal-backdrop">
             <section className="plan-modal admin-plan-modal">
@@ -2610,7 +4397,14 @@ export default function Home() {
                     Cancel
                   </button>
                   <button disabled={isAdminPlanSaving} type="submit">
-                    {isAdminPlanSaving ? "Saving..." : editingAdminPlanId ? "Update Plan" : "Add Plan"}
+                    {isAdminPlanSaving ? (
+                      "Saving..."
+                    ) : (
+                      <>
+                        <ActionIcon type={editingAdminPlanId ? "edit" : "add"} />
+                        {editingAdminPlanId ? "Update Plan" : "Add Plan"}
+                      </>
+                    )}
                   </button>
                 </footer>
               </form>
@@ -2820,7 +4614,7 @@ function CommonTable({
   isLoading,
   pagination,
 }: {
-  columns: string[];
+  columns: ReactNode[];
   rows: Array<Array<ReactNode>>;
   emptyText: string;
   isLoading?: boolean;
@@ -2836,8 +4630,8 @@ function CommonTable({
       <table>
         <thead>
           <tr>
-            {columns.map((column) => (
-              <th key={column}>{column}</th>
+            {columns.map((column, columnIndex) => (
+              <th key={columnIndex}>{column}</th>
             ))}
           </tr>
         </thead>

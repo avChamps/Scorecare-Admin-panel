@@ -15,6 +15,18 @@ select {
   font: inherit;
 }
 
+.button-icon {
+  fill: none;
+  height: 16px;
+  margin-right: 7px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  vertical-align: -3px;
+  width: 16px;
+}
+
 .auth-page {
   align-items: center;
   background:
@@ -302,9 +314,10 @@ select {
 }
 
 .admin-layout {
-  display: flex;
-  min-height: 100vh;
   background: #f5f7fb;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -313,6 +326,8 @@ select {
   box-shadow: 12px 0 32px rgba(15, 23, 42, 0.05);
   color: #0f172a;
   flex: 0 0 244px;
+  height: 100vh;
+  overflow-y: auto;
   padding: 18px 12px;
   transition: flex-basis 0.2s ease, padding 0.2s ease;
 }
@@ -403,6 +418,12 @@ select {
   padding: 10px 12px;
 }
 
+.sidebar-submenu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
 .sidebar button:hover,
 .sidebar button.active {
   background: #eef5ff;
@@ -423,8 +444,13 @@ select {
 }
 
 .content {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  height: 100vh;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 
 .api-loader-overlay {
@@ -448,6 +474,7 @@ select {
 }
 
 .topbar {
+  flex: 0 0 58px;
   align-items: center;
   background: #ffffff;
   border-bottom: 1px solid #e5ebf5;
@@ -505,9 +532,14 @@ select {
 }
 
 .dashboard-body {
+  align-content: start;
   display: grid;
   gap: 24px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 32px;
+  scrollbar-gutter: stable;
 }
 
 .welcome-panel,
@@ -861,6 +893,159 @@ select {
   box-shadow: 0 0 0 4px rgba(105, 117, 223, 0.12);
 }
 
+.date-filter {
+  position: relative;
+}
+
+.table-toolbar .date-filter-trigger {
+  align-items: center;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f9ff 100%);
+  border: 1px solid #dbe4f3;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  color: #8a94a8;
+  display: flex;
+  font-weight: 800;
+  gap: 10px;
+  height: 44px;
+  justify-content: space-between;
+  padding: 0 14px;
+  width: 100%;
+}
+
+.table-toolbar .date-filter-trigger.selected {
+  color: #111827;
+}
+
+.table-toolbar .date-filter-trigger:hover,
+.table-toolbar .date-filter-trigger:focus {
+  background: #ffffff;
+  border-color: #8aa7e8;
+  box-shadow: 0 0 0 4px rgba(23, 105, 224, 0.1);
+  transform: none;
+}
+
+.date-filter-trigger svg {
+  fill: none;
+  height: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 18px;
+}
+
+.date-picker-popover {
+  background: #ffffff;
+  border: 1px solid #dce6f5;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(27, 39, 75, 0.18);
+  left: 0;
+  padding: 14px;
+  position: absolute;
+  top: calc(100% + 10px);
+  width: 316px;
+  z-index: 30;
+}
+
+.date-picker-popover::before {
+  background: #ffffff;
+  border-left: 1px solid #dce6f5;
+  border-top: 1px solid #dce6f5;
+  content: "";
+  height: 12px;
+  left: 24px;
+  position: absolute;
+  top: -7px;
+  transform: rotate(45deg);
+  width: 12px;
+}
+
+.date-picker-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.date-picker-header strong {
+  color: #111827;
+  font-size: 15px;
+}
+
+.table-toolbar .date-picker-popover button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: none;
+  color: #273449;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 800;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.table-toolbar .date-picker-popover button:hover {
+  background: #eef5ff;
+  color: #1769e0;
+  transform: none;
+}
+
+.date-picker-header button {
+  width: 34px;
+}
+
+.date-picker-weekdays,
+.date-picker-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.date-picker-weekdays {
+  margin-bottom: 6px;
+}
+
+.date-picker-weekdays span {
+  color: #8a94a8;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.date-picker-days button.muted {
+  color: #b7c0cf;
+}
+
+.table-toolbar .date-picker-days button.today {
+  background: #eef5ff;
+  color: #1769e0;
+}
+
+.table-toolbar .date-picker-days button.selected {
+  background: linear-gradient(135deg, #1769e0, #5b8def);
+  box-shadow: 0 8px 18px rgba(23, 105, 224, 0.28);
+  color: #ffffff;
+}
+
+.date-picker-footer {
+  border-top: 1px solid #edf1f7;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.table-toolbar .date-picker-footer button {
+  color: #1769e0;
+  padding: 0 10px;
+}
+
 .loan-toolbar {
   grid-template-columns: minmax(220px, 1fr) 180px 44px auto auto;
 }
@@ -889,10 +1074,16 @@ select {
 }
 
 .general-form input,
+.general-form textarea,
 .faqs-form input,
 .faqs-form textarea,
+.homepage-theme-form input,
 .admin-plan-form input,
 .admin-plan-form textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
   background: #f8f9ff;
   border: 1px solid #e4e8f5;
   border-radius: 10px;
@@ -903,11 +1094,13 @@ select {
 
 .general-form input,
 .faqs-form input,
+.homepage-theme-form input,
 .admin-plan-form input {
   height: 44px;
 }
 
 .faqs-form textarea,
+.general-form textarea,
 .admin-plan-form textarea {
   min-height: 112px;
   padding: 12px 14px;
@@ -915,18 +1108,152 @@ select {
 }
 
 .general-form input:focus,
+.general-form textarea:focus,
 .faqs-form input:focus,
 .faqs-form textarea:focus,
+.homepage-theme-form input:focus,
 .admin-plan-form input:focus,
 .admin-plan-form textarea:focus {
   border-color: #6975df;
   box-shadow: 0 0 0 4px rgba(105, 117, 223, 0.12);
 }
 
+.legal-editor-panel {
+  display: grid;
+  gap: 16px;
+  max-width: 1040px;
+  overflow: visible;
+  padding: 22px;
+}
+
+.legal-panel-heading {
+  align-items: center;
+  border-bottom: 1px solid #e5edf7;
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 14px;
+}
+
+.legal-panel-heading span {
+  background: #eaf3ff;
+  border: 1px solid #cfe1ff;
+  border-radius: 999px;
+  color: #1769e0;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 10px;
+}
+
+.legal-panel-heading strong {
+  color: #0f172a;
+  font-size: 17px;
+}
+
+.html-editor-field {
+  background: #fbfdff;
+  border: 1px solid #dce7f5;
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.html-editor-label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.html-editor-toolbar {
+  align-items: center;
+  background: #f8fbff;
+  border: 1px solid #dce7f5;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+}
+
+.html-editor-toolbar button,
+.html-editor-toolbar select {
+  background: #ffffff;
+  border: 1px solid #d9e4f2;
+  border-radius: 7px;
+  color: #334155;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  height: 32px;
+  outline: none;
+  padding: 0 10px;
+}
+
+.html-editor-toolbar button:hover,
+.html-editor-toolbar select:focus {
+  background: #eaf3ff;
+  border-color: #bcd7ff;
+  color: #1769e0;
+}
+
+.html-editor-box {
+  background: #ffffff;
+  border: 1px solid #dce7f5;
+  border-radius: 0 0 10px 10px;
+  border-top: 0;
+  color: #1e293b;
+  font-size: 15px;
+  line-height: 1.7;
+  height: 260px;
+  max-height: 260px;
+  outline: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  scrollbar-gutter: stable;
+}
+
+.html-editor-box:focus {
+  border-color: #1769e0;
+  box-shadow: 0 10px 30px rgba(23, 105, 224, 0.12);
+}
+
+.html-editor-box h1,
+.html-editor-box h2,
+.html-editor-box h3 {
+  color: #0f172a;
+  line-height: 1.25;
+  margin: 0 0 12px;
+}
+
+.html-editor-box p {
+  margin: 0 0 12px;
+}
+
+.html-editor-box ul,
+.html-editor-box ol {
+  margin: 0 0 12px 22px;
+  padding: 0;
+}
+
+.html-editor-box a {
+  color: #1769e0;
+  font-weight: 800;
+}
+
+
 .admin-plan-form {
   display: grid;
   gap: 16px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
   padding: 24px;
+}
+
+.admin-plan-form input:focus,
+.admin-plan-form textarea:focus {
+  box-shadow: inset 0 0 0 3px rgba(105, 117, 223, 0.12);
 }
 
 .admin-plan-form-header {
@@ -961,12 +1288,14 @@ select {
   font-size: 13px;
   font-weight: 800;
   gap: 8px;
+  min-width: 0;
 }
 
 .admin-plan-grid {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
 }
 
 .admin-plan-grid.two {
@@ -975,6 +1304,32 @@ select {
 
 .admin-plan-grid.compact {
   grid-template-columns: minmax(160px, 220px);
+}
+
+.repair-content-card {
+  border: 1px solid #e4e8f5;
+  border-radius: 10px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.repair-content-card .table-action {
+  justify-self: start;
+}
+
+.repair-content-card input:focus,
+.repair-content-card textarea:focus {
+  box-shadow: none;
+  outline: 2px solid #6975df;
+  outline-offset: -2px;
+}
+
+.repair-content-footer {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
 }
 
 .admin-plan-active {
@@ -1010,6 +1365,10 @@ select {
   max-height: 86vh;
   max-width: 680px;
   overflow: auto;
+}
+
+.notification-modal {
+  overflow-x: hidden;
 }
 
 .admin-plan-modal header {
@@ -1354,6 +1713,112 @@ select {
   justify-self: end;
 }
 
+.homepage-themes-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.homepage-themes-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.homepage-theme-table {
+  border: 1px solid #e4e8f5;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.homepage-theme-table table {
+  border-collapse: collapse;
+  min-width: 760px;
+  width: 100%;
+}
+
+.homepage-theme-table th,
+.homepage-theme-table td {
+  border-bottom: 1px solid #e4e8f5;
+  padding: 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.homepage-theme-table th {
+  background: #f8faff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.homepage-theme-table td span {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.homepage-theme-table img {
+  border: 1px solid #e4e8f5;
+  border-radius: 8px;
+  display: block;
+  height: 48px;
+  object-fit: cover;
+  width: 80px;
+}
+
+.homepage-theme-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.homepage-theme-row-actions button,
+.homepage-themes-actions button {
+  background: #1769e0;
+  border: 1px solid #1769e0;
+  border-radius: 10px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  height: 44px;
+  padding: 0 20px;
+}
+
+.homepage-theme-row-actions button:last-child {
+  background: #ffffff;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.homepage-theme-row-actions button:disabled,
+.homepage-themes-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.homepage-theme-form {
+  display: grid;
+  gap: 16px;
+}
+
+.homepage-theme-form label {
+  color: #475569;
+  display: grid;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 8px;
+}
+
+.homepage-theme-form .faq-checkbox {
+  height: auto;
+  padding-bottom: 0;
+}
+
 .empty-state {
   align-items: center;
   color: #475569;
@@ -1449,10 +1914,69 @@ select {
   color: #0f5fcf;
 }
 
+.table-toolbar .date-filter-trigger,
+.table-toolbar .date-filter-trigger:last-child {
+  background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+  border: 1px solid #dbe4f3;
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 8px 18px rgba(38, 48, 84, 0.06);
+  color: #7b8799;
+  font-size: 14px;
+  justify-content: space-between;
+  padding: 0 14px;
+}
+
+.table-toolbar .date-filter-trigger.selected,
+.table-toolbar .date-filter-trigger.selected:last-child {
+  border-color: #b8c9e6;
+  color: #111827;
+}
+
+.table-toolbar .date-filter-trigger:hover,
+.table-toolbar .date-filter-trigger:last-child:hover,
+.table-toolbar .date-filter-trigger:focus {
+  background: #ffffff;
+  border-color: #8aa7e8;
+  box-shadow: 0 0 0 4px rgba(23, 105, 224, 0.1);
+  color: #111827;
+  transform: none;
+}
+
 .table-toolbar button:disabled,
 .pagination-bar button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.table-toolbar .date-picker-popover button,
+.table-toolbar .date-picker-popover button:last-child {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: #273449;
+  height: 34px;
+  padding: 0;
+}
+
+.table-toolbar .date-picker-popover button:hover,
+.table-toolbar .date-picker-popover button:last-child:hover {
+  background: #eef5ff;
+  border: 0;
+  color: #1769e0;
+  transform: none;
+}
+
+.table-toolbar .date-picker-days button.selected,
+.table-toolbar .date-picker-days button.selected:last-child {
+  background: linear-gradient(135deg, #1769e0, #5b8def);
+  box-shadow: 0 8px 18px rgba(23, 105, 224, 0.28);
+  color: #ffffff;
+}
+
+.table-toolbar .date-picker-footer button,
+.table-toolbar .date-picker-footer button:last-child {
+  color: #1769e0;
+  padding: 0 10px;
 }
 
 .orders-panel th,
@@ -1679,6 +2203,31 @@ select {
   white-space: nowrap;
 }
 
+.subscription-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.subscription-actions .table-action {
+  border-radius: 8px;
+  font-size: 14px;
+  height: 44px;
+  gap: 8px;
+  padding: 0 20px;
+}
+
+.subscription-actions .table-action.primary {
+  background: #1f6fe5;
+  border-color: #1f6fe5;
+  color: #ffffff;
+}
+
+.subscription-actions .table-action.primary:hover {
+  background: #185fc7;
+  border-color: #185fc7;
+}
+
 .message-list {
   display: grid;
   gap: 8px;
@@ -1884,6 +2433,12 @@ select {
   color: #ffffff;
 }
 
+.modal-actions button.danger-action {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
 .modal-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
@@ -1995,6 +2550,8 @@ select {
 @media (max-width: 560px) {
   .admin-layout {
     display: block;
+    height: 100vh;
+    overflow: hidden;
   }
 
   .sidebar {
@@ -2018,6 +2575,7 @@ select {
   }
 
   .content {
+    height: 100vh;
     width: 100%;
   }
 
@@ -2182,6 +2740,15 @@ select {
   .table-toolbar select,
   .table-toolbar button {
     width: 100%;
+  }
+
+  .date-picker-popover {
+    max-width: calc(100vw - 32px);
+    width: 100%;
+  }
+
+  .table-toolbar .date-picker-popover button {
+    width: auto;
   }
 
   .common-table {
