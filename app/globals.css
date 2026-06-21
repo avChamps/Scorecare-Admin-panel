@@ -1136,6 +1136,8 @@ select {
   gap: 12px;
   grid-template-columns: minmax(220px, 1fr) 170px 170px 44px auto auto;
   padding: 16px;
+  position: relative;
+  z-index: 2;
 }
 
 .report-download-toolbar {
@@ -1716,6 +1718,50 @@ select {
 .credit-repair-accounts span {
   display: grid;
   gap: 2px;
+}
+
+.dispute-table-cell {
+  display: grid;
+  gap: 5px;
+  min-width: 150px;
+}
+
+.dispute-table-cell > span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.dispute-documents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 260px;
+}
+
+.dispute-documents .table-action {
+  height: 30px;
+  padding: 0 10px;
+}
+
+.dispute-status {
+  background: #eef5ff;
+  border-radius: 999px;
+  color: #1769e0;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 11px;
+  white-space: nowrap;
+}
+
+.dispute-timeline {
+  min-width: 190px;
+}
+
+.dispute-timeline span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .admin-plan-form .comparison-benefit-options .faq-checkbox {

@@ -49,6 +49,11 @@ const menuIcons: Record<string, ReactNode> = {
       <path d="M4 7h16v12H4zM8 7V4h8v3M9 12h6M12 9v6" />
     </svg>
   ),
+  Revenue: (
+    <svg viewBox="0 0 24 24">
+      <path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5M15 6v4M13 8h4" />
+    </svg>
+  ),
   Users: (
     <svg viewBox="0 0 24 24">
       <path d="M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8" />
@@ -255,7 +260,7 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
 
 type ManualReportType = "experian" | "cibil" | "crif";
 
@@ -275,6 +280,8 @@ const viewRoutes: Record<AppView, string> = {
   "Basic Plan": "/basic-plan",
   "Credit Repair": "/services/credit-repair",
   Disputes: "/services/disputes",
+  "Basic Subscription": "/revenue/basic-subscriptions",
+  "Repair Service Subscription": "/revenue/repair-service-subscriptions",
   Users: "/users",
   Employees: "/employees",
   Roles: "/roles",
@@ -302,6 +309,8 @@ const routeViews: Record<string, AppView> = {
   "/basic-plan": "Basic Plan",
   "/services/credit-repair": "Credit Repair",
   "/services/disputes": "Disputes",
+  "/revenue/basic-subscriptions": "Basic Subscription",
+  "/revenue/repair-service-subscriptions": "Repair Service Subscription",
   "/feedback": "Feedback",
   "/contact-us": "Contact Us",
   "/reports/downloads": "Report Downloads",
@@ -326,6 +335,8 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   "Basic Plan": { menuName: "Plans & Benefits", childMenuName: "Basic plan" },
   "Credit Repair": { menuName: "Services", childMenuName: "Credit Repair" },
   Disputes: { menuName: "Services", childMenuName: "Disputes" },
+  "Basic Subscription": { menuName: "Revenue", childMenuName: "Basic Subscription" },
+  "Repair Service Subscription": { menuName: "Revenue", childMenuName: "Repair Service Subscription" },
   Users: { menuName: "User management", childMenuName: "Users" },
   Employees: { menuName: "Employee management", childMenuName: "Employees" },
   Roles: { menuName: "Employee management", childMenuName: "Roles" },
@@ -886,6 +897,11 @@ type CreditRepairRequest = {
   repairStatus: string;
   activeDisputes: number;
   resolvedDisputes: number;
+  activeRepairRequests?: number;
+  resolvedRepairRequests?: number;
+  closedRepairRequests?: number;
+  cancelledRepairRequests?: number;
+  totalRepairRequests?: number;
   pointsGained: number;
   progressItems: unknown[];
   remarks?: string | null;
@@ -941,6 +957,37 @@ type CreditRepairRequestsResponse = {
 
 type DisputesResponse = {
   disputes: DisputeRequest[];
+  pagination?: ServicePagination;
+};
+
+type BasicSubscriptionRow = {
+  id?: string;
+  publicId?: string;
+  userName?: string;
+  fullName?: string;
+  email?: string;
+  mobileNumber?: string;
+  planName?: string;
+  amount?: number;
+  currency?: string;
+  status?: string;
+  subscriptionStatus?: string;
+  paymentStatus?: string;
+  razorpaySubscriptionId?: string | null;
+  subscriptionStartedAt?: string | null;
+  subscriptionDueAt?: string | null;
+  subscriptionEndsAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  user?: {
+    fullName?: string;
+    email?: string;
+    mobileNumber?: string;
+  } | null;
+};
+
+type BasicSubscriptionsResponse = {
+  subscriptions: BasicSubscriptionRow[];
   pagination?: ServicePagination;
 };
 
@@ -1127,6 +1174,7 @@ export default function Home() {
   const [isSubscriptionsMenuOpen, setIsSubscriptionsMenuOpen] = useState(false);
   const [isPlansBenefitsMenuOpen, setIsPlansBenefitsMenuOpen] = useState(false);
   const [isServicesMenuOpen, setIsServicesMenuOpen] = useState(false);
+  const [isRevenueMenuOpen, setIsRevenueMenuOpen] = useState(false);
   const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [activeView, setActiveView] = useState<AppView>("Dashboard");
@@ -1241,6 +1289,21 @@ export default function Home() {
   const [disputeStatus, setDisputeStatus] = useState("under_review");
   const [disputeRemarks, setDisputeRemarks] = useState("");
   const [isUpdatingDispute, setIsUpdatingDispute] = useState(false);
+  const [basicSubscriptionsData, setBasicSubscriptionsData] = useState<BasicSubscriptionsResponse | null>(null);
+  const [basicSubscriptionsSearch, setBasicSubscriptionsSearch] = useState("");
+  const [basicSubscriptionsStatus, setBasicSubscriptionsStatus] = useState("active");
+  const [basicSubscriptionsFromDate, setBasicSubscriptionsFromDate] = useState("");
+  const [basicSubscriptionsToDate, setBasicSubscriptionsToDate] = useState("");
+  const [basicSubscriptionsError, setBasicSubscriptionsError] = useState("");
+  const [isBasicSubscriptionsLoading, setIsBasicSubscriptionsLoading] = useState(false);
+  const [repairSubscriptionsData, setRepairSubscriptionsData] = useState<CreditRepairRequestsResponse | null>(null);
+  const [repairSubscriptionsSearch, setRepairSubscriptionsSearch] = useState("");
+  const [repairSubscriptionsStatus, setRepairSubscriptionsStatus] = useState("submitted");
+  const [repairSubscriptionsPaymentStatus, setRepairSubscriptionsPaymentStatus] = useState("paid");
+  const [repairSubscriptionsFromDate, setRepairSubscriptionsFromDate] = useState("");
+  const [repairSubscriptionsToDate, setRepairSubscriptionsToDate] = useState("");
+  const [repairSubscriptionsError, setRepairSubscriptionsError] = useState("");
+  const [isRepairSubscriptionsLoading, setIsRepairSubscriptionsLoading] = useState(false);
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings>({
     website: "",
     email: "",
@@ -1377,6 +1440,14 @@ export default function Home() {
       loadDisputes();
     }
 
+    if (view === "Basic Subscription") {
+      loadBasicSubscriptions();
+    }
+
+    if (view === "Repair Service Subscription") {
+      loadRepairSubscriptions();
+    }
+
     if (view === "Feedback") {
       loadFeedback();
     }
@@ -1386,7 +1457,7 @@ export default function Home() {
     }
 
     if (view === "Users" || view === "Subscriptions") {
-      loadUsers();
+      loadUsers(1, usersSearch, view === "Subscriptions");
     }
 
     if (view === "Report Downloads") {
@@ -1557,7 +1628,7 @@ export default function Home() {
     }
   }
 
-  async function loadUsers(page = 1, search = usersSearch) {
+  async function loadUsers(page = 1, search = usersSearch, subscribedOnly = activeView === "Subscriptions") {
     if (!adminUser?.token) {
       return;
     }
@@ -1570,6 +1641,10 @@ export default function Home() {
         limit: "10",
         search,
       });
+
+      if (subscribedOnly) {
+        params.set("subscribedOnly", "true");
+      }
 
       if (usersFromDate) {
         params.set("from", `${usersFromDate} 00:00:00`);
@@ -3701,6 +3776,92 @@ export default function Home() {
     }
   }
 
+  async function loadBasicSubscriptions(
+    page = 1,
+    search = basicSubscriptionsSearch,
+    status = basicSubscriptionsStatus,
+    from = basicSubscriptionsFromDate,
+    to = basicSubscriptionsToDate
+  ) {
+    if (!adminUser?.token) return;
+
+    try {
+      setBasicSubscriptionsError("");
+      setIsBasicSubscriptionsLoading(true);
+      const params = new URLSearchParams({ page: String(page), limit: "10", search, status, from, totime: to });
+      const response = await fetch(`${API_BASE_URL}/admin/basic-subscriptions?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load basic subscriptions");
+      }
+
+      const data = result.data;
+      setBasicSubscriptionsData({
+        subscriptions: Array.isArray(data) ? data : data?.subscriptions || data?.basicSubscriptions || data?.users || [],
+        pagination: Array.isArray(data) ? undefined : data?.pagination,
+      });
+    } catch (error) {
+      setBasicSubscriptionsError(error instanceof Error ? error.message : "Unable to load basic subscriptions");
+    } finally {
+      setIsBasicSubscriptionsLoading(false);
+    }
+  }
+
+  function resetBasicSubscriptionFilters() {
+    setBasicSubscriptionsSearch("");
+    setBasicSubscriptionsStatus("active");
+    setBasicSubscriptionsFromDate("");
+    setBasicSubscriptionsToDate("");
+    loadBasicSubscriptions(1, "", "active", "", "");
+  }
+
+  async function loadRepairSubscriptions(
+    page = 1,
+    search = repairSubscriptionsSearch,
+    repairStatus = repairSubscriptionsStatus,
+    paymentStatus = repairSubscriptionsPaymentStatus,
+    from = repairSubscriptionsFromDate,
+    to = repairSubscriptionsToDate
+  ) {
+    if (!adminUser?.token) return;
+
+    try {
+      setRepairSubscriptionsError("");
+      setIsRepairSubscriptionsLoading(true);
+      const params = new URLSearchParams({ page: String(page), limit: "10", search, repairStatus, paymentStatus, from, totime: to });
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load repair service subscriptions");
+      }
+
+      const data = result.data;
+      setRepairSubscriptionsData({
+        requests: Array.isArray(data) ? data : data?.requests || data?.cibilRepairRequests || [],
+        pagination: Array.isArray(data) ? undefined : data?.pagination,
+      });
+    } catch (error) {
+      setRepairSubscriptionsError(error instanceof Error ? error.message : "Unable to load repair service subscriptions");
+    } finally {
+      setIsRepairSubscriptionsLoading(false);
+    }
+  }
+
+  function resetRepairSubscriptionFilters() {
+    setRepairSubscriptionsSearch("");
+    setRepairSubscriptionsStatus("submitted");
+    setRepairSubscriptionsPaymentStatus("paid");
+    setRepairSubscriptionsFromDate("");
+    setRepairSubscriptionsToDate("");
+    loadRepairSubscriptions(1, "", "submitted", "paid", "", "");
+  }
+
   async function loadLoans(page = 1, search = loansSearch, status = loansStatus) {
     if (!adminUser?.token) {
       return;
@@ -4128,6 +4289,7 @@ export default function Home() {
       setIsSubscriptionsMenuOpen(routeView === "Subscriptions");
       setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits" || routeView === "Basic Plan");
       setIsServicesMenuOpen(routeView === "Credit Repair" || routeView === "Disputes");
+      setIsRevenueMenuOpen(routeView === "Basic Subscription" || routeView === "Repair Service Subscription");
       setIsReportsMenuOpen(routeView === "Report Downloads" || routeView === "Download CIBIL" || routeView === "Manual Report");
 
       if (routeView === "Plans & Benefits") {
@@ -4282,6 +4444,18 @@ export default function Home() {
       loadDisputes();
     }
   }, [activeView, adminUser?.token, disputesData, isDisputesLoading]);
+
+  useEffect(() => {
+    if (activeView === "Basic Subscription" && adminUser?.token && !basicSubscriptionsData && !isBasicSubscriptionsLoading) {
+      loadBasicSubscriptions();
+    }
+  }, [activeView, adminUser?.token, basicSubscriptionsData, isBasicSubscriptionsLoading]);
+
+  useEffect(() => {
+    if (activeView === "Repair Service Subscription" && adminUser?.token && !repairSubscriptionsData && !isRepairSubscriptionsLoading) {
+      loadRepairSubscriptions();
+    }
+  }, [activeView, adminUser?.token, repairSubscriptionsData, isRepairSubscriptionsLoading]);
 
   useEffect(() => {
     if (activeView === "Chats" && adminUser?.token && !chatsData && !isChatsLoading) {
@@ -4949,55 +5123,74 @@ export default function Home() {
         </button>,
       ] : []),
     ]) ?? [];
-    const disputeColumns = [
-      "User",
-      "Mobile",
-      "Email",
-      "Lender",
-      "Account Type",
-      "Account Number",
-      "Error Type",
-      "Bureaus",
-      "Additional Details",
-      "Documents",
-      "Status",
-      "Progress Step",
-      "Points Gained",
-      "Remarks",
-      "Submitted At",
-      "Resolved At",
-      "Updated At",
-      ...(canUpdateDisputes ? ["Action"] : []),
-    ];
+    const disputeColumns = ["User", "Account", "Dispute", "Documents", "Status", "Progress", "Timeline", ...(canUpdateDisputes ? ["Action"] : [])];
     const disputeRows = disputesData?.disputes.map((dispute) => [
-      dispute.userName || "-",
-      dispute.mobileNumber || "-",
-      dispute.email || "-",
-      dispute.lenderName || dispute.accountData?.lenderName || "-",
-      dispute.accountData?.accountType || "-",
-      dispute.accountNumber || dispute.accountData?.accountNumber || "-",
-      dispute.errorType || "-",
-      dispute.bureaus?.join(", ") || "-",
-      dispute.additionalDetails || "-",
+      <div className="dispute-table-cell">
+        <strong>{dispute.userName || "-"}</strong>
+        <span>{dispute.mobileNumber || "-"}</span>
+        <span>{dispute.email || "-"}</span>
+      </div>,
+      <div className="dispute-table-cell">
+        <strong>{dispute.lenderName || dispute.accountData?.lenderName || "-"}</strong>
+        <span>{dispute.accountData?.accountType || "-"}</span>
+        <span>{dispute.accountNumber || dispute.accountData?.accountNumber || "-"}</span>
+      </div>,
+      <div className="dispute-table-cell">
+        <strong>{dispute.errorType || "-"}</strong>
+        <span>{dispute.bureaus?.join(", ") || "-"}</span>
+        {dispute.additionalDetails ? <span>{dispute.additionalDetails}</span> : null}
+        {dispute.remarks ? <span>Remarks: {dispute.remarks}</span> : null}
+      </div>,
       dispute.documents && Object.keys(dispute.documents).length ? (
-        <div className="table-actions">
+        <div className="dispute-documents">
           {Object.entries(dispute.documents).map(([name, url]) => (
             <a className="table-action" href={url} key={name} rel="noreferrer" target="_blank">{formatLabel(name)}</a>
           ))}
         </div>
       ) : "-",
-      formatLabel(dispute.status),
-      dispute.progressStep ?? 0,
-      dispute.pointsGained ?? 0,
-      dispute.remarks || "-",
-      formatDate(dispute.submittedAt || dispute.createdAt || null),
-      formatDate(dispute.resolvedAt || null),
-      formatDate(dispute.updatedAt || null),
+      <span className="dispute-status">{formatLabel(dispute.status)}</span>,
+      <div className="dispute-table-cell">
+        <span>Step <strong>{dispute.progressStep ?? 0}</strong></span>
+        <span>Points <strong>{dispute.pointsGained ?? 0}</strong></span>
+      </div>,
+      <div className="dispute-table-cell dispute-timeline">
+        <span>Submitted <strong>{formatDate(dispute.submittedAt || dispute.createdAt || null)}</strong></span>
+        <span>Resolved <strong>{formatDate(dispute.resolvedAt || null)}</strong></span>
+        <span>Updated <strong>{formatDate(dispute.updatedAt || null)}</strong></span>
+      </div>,
       ...(canUpdateDisputes ? [
         <button className="table-action" type="button" onClick={() => openDisputeUpdate(dispute)}>
           <ActionIcon type="edit" />Update
         </button>,
       ] : []),
+    ]) ?? [];
+    const basicSubscriptionColumns = ["User", "Mobile", "Email", "Plan", "Amount", "Payment Status", "Subscription Status", "Started At", "Due At", "Ends At", "Created At"];
+    const basicSubscriptionRows = basicSubscriptionsData?.subscriptions.map((subscription) => [
+      subscription.userName || subscription.fullName || subscription.user?.fullName || "-",
+      subscription.mobileNumber || subscription.user?.mobileNumber || "-",
+      subscription.email || subscription.user?.email || "-",
+      subscription.planName || "Basic Plan",
+      `${subscription.currency || "INR"} ${Number(subscription.amount || 0).toLocaleString("en-IN")}`,
+      formatLabel(subscription.paymentStatus || "-"),
+      formatLabel(subscription.subscriptionStatus || subscription.status || "-"),
+      formatDate(subscription.subscriptionStartedAt || null),
+      formatDate(subscription.subscriptionDueAt || null),
+      formatDate(subscription.subscriptionEndsAt || null),
+      formatDate(subscription.createdAt || null),
+    ]) ?? [];
+    const repairSubscriptionColumns = ["User", "Mobile", "Email", "Amount", "Payment Status", "Repair Status", "Active Repairs", "Resolved Repairs", "Closed Repairs", "Cancelled Repairs", "Created At"];
+    const repairSubscriptionRows = repairSubscriptionsData?.requests.map((request) => [
+      request.userName || "-",
+      request.mobileNumber || "-",
+      request.email || "-",
+      `${request.currency || "INR"} ${Number(request.amount || 0).toLocaleString("en-IN")}`,
+      formatLabel(request.paymentStatus),
+      formatLabel(request.repairStatus),
+      request.activeRepairRequests ?? 0,
+      request.resolvedRepairRequests ?? 0,
+      request.closedRepairRequests ?? 0,
+      request.cancelledRepairRequests ?? 0,
+      formatDate(request.createdAt || null),
     ]) ?? [];
     const chatColumns = ["User", "Mobile", "PAN", "Question ID", "Question", "Created At"];
     const chatRows = chatsData?.users?.flatMap((user) =>
@@ -5153,6 +5346,21 @@ export default function Home() {
                           <div className="sidebar-submenu">
                             {hasViewPermission("Credit Repair") ? <button className={activeView === "Credit Repair" ? "active" : ""} type="button" onClick={() => openAdminView("Credit Repair")}><span className="menu-icon">{menuIcons.Services}</span>Credit Repair</button> : null}
                             {hasViewPermission("Disputes") ? <button className={activeView === "Disputes" ? "active" : ""} type="button" onClick={() => openAdminView("Disputes")}><span className="menu-icon">{menuIcons.Services}</span>Disputes</button> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {hasViewPermission("Basic Subscription") || hasViewPermission("Repair Service Subscription") ? (
+                      <div className={`sidebar-group ${activeView === "Basic Subscription" || activeView === "Repair Service Subscription" ? "active" : ""}`}>
+                        <button className="sidebar-group-toggle" type="button" onClick={() => setIsRevenueMenuOpen((current) => !current)}>
+                          <span className="menu-icon">{menuIcons.Revenue}</span>
+                          Revenue
+                          <span className="sidebar-chevron">{isRevenueMenuOpen ? "⌄" : "›"}</span>
+                        </button>
+                        {isRevenueMenuOpen ? (
+                          <div className="sidebar-submenu">
+                            {hasViewPermission("Basic Subscription") ? <button className={activeView === "Basic Subscription" ? "active" : ""} type="button" onClick={() => openAdminView("Basic Subscription")}><span className="menu-icon">{menuIcons.Revenue}</span>Basic Subscription</button> : null}
+                            {hasViewPermission("Repair Service Subscription") ? <button className={activeView === "Repair Service Subscription" ? "active" : ""} type="button" onClick={() => openAdminView("Repair Service Subscription")}><span className="menu-icon">{menuIcons.Revenue}</span>Repair Service Subscription</button> : null}
                           </div>
                         ) : null}
                       </div>
@@ -6408,7 +6616,7 @@ export default function Home() {
                   <button className="icon-button" title="Reset filters" type="button" onClick={resetUsersFilters}>
                     ↻
                   </button>
-                  <button type="button" onClick={() => loadUsers(1)}>
+                  <button type="button" onClick={() => loadUsers(1, usersSearch, false)}>
                     Search
                   </button>
                   {canExportUsers ? (
@@ -6672,7 +6880,7 @@ export default function Home() {
                   <button className="icon-button" title="Reset filters" type="button" onClick={resetUsersFilters}>
                     ↻
                   </button>
-                  <button type="button" onClick={() => loadUsers(1)}>
+                  <button type="button" onClick={() => loadUsers(1, usersSearch, true)}>
                     Search
                   </button>
                   {canExportUsers ? (
@@ -6688,7 +6896,69 @@ export default function Home() {
                   columns={subscriptionColumns}
                   emptyText={isUsersLoading ? "Loading subscriptions..." : "No subscriptions found"}
                   isLoading={isUsersLoading}
+                  pagination={usersData ? {
+                    page: usersData.pagination.page,
+                    totalPages: usersData.pagination.totalPages,
+                    onPrevious: () => loadUsers(usersData.pagination.page - 1, usersSearch, true),
+                    onNext: () => loadUsers(usersData.pagination.page + 1, usersSearch, true),
+                  } : undefined}
                   rows={subscriptionRows}
+                />
+              </>
+            ) : activeView === "Basic Subscription" ? (
+              <>
+                <section className="welcome-panel">
+                  <div><h2>Basic Plan Subscriptions</h2><p>Review basic plan subscription revenue</p></div>
+                  <span>{basicSubscriptionsData?.pagination?.total ?? basicSubscriptionsData?.subscriptions.length ?? 0} subscriptions</span>
+                </section>
+                <div className="mobile-toolbar-actions"><button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>Filter</button></div>
+                <section className={`table-toolbar ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
+                  <input placeholder="Search subscriptions..." value={basicSubscriptionsSearch} onChange={(event) => setBasicSubscriptionsSearch(event.target.value)} />
+                  <DateFilter label="Start date" value={basicSubscriptionsFromDate} onChange={setBasicSubscriptionsFromDate} />
+                  <DateFilter label="End date" value={basicSubscriptionsToDate} onChange={setBasicSubscriptionsToDate} />
+                  <button className="icon-button" title="Reset filters" type="button" onClick={resetBasicSubscriptionFilters}>↻</button>
+                  <button type="button" onClick={() => loadBasicSubscriptions(1)}>Search</button>
+                </section>
+                {basicSubscriptionsError ? <p className="dashboard-error">{basicSubscriptionsError}</p> : null}
+                <CommonTable
+                  columns={basicSubscriptionColumns}
+                  emptyText={isBasicSubscriptionsLoading ? "Loading basic subscriptions..." : "No basic subscriptions found"}
+                  isLoading={isBasicSubscriptionsLoading}
+                  pagination={basicSubscriptionsData?.pagination ? {
+                    page: basicSubscriptionsData.pagination.page,
+                    totalPages: basicSubscriptionsData.pagination.totalPages,
+                    onPrevious: () => loadBasicSubscriptions(basicSubscriptionsData.pagination!.page - 1),
+                    onNext: () => loadBasicSubscriptions(basicSubscriptionsData.pagination!.page + 1),
+                  } : undefined}
+                  rows={basicSubscriptionRows}
+                />
+              </>
+            ) : activeView === "Repair Service Subscription" ? (
+              <>
+                <section className="welcome-panel">
+                  <div><h2>Repair Service Subscriptions</h2><p>Review credit repair subscription revenue</p></div>
+                  <span>{repairSubscriptionsData?.pagination?.total ?? repairSubscriptionsData?.requests.length ?? 0} subscriptions</span>
+                </section>
+                <div className="mobile-toolbar-actions"><button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>Filter</button></div>
+                <section className={`table-toolbar ${isMobileFiltersOpen ? "mobile-open" : ""}`}>
+                  <input placeholder="Search subscriptions..." value={repairSubscriptionsSearch} onChange={(event) => setRepairSubscriptionsSearch(event.target.value)} />
+                  <DateFilter label="Start date" value={repairSubscriptionsFromDate} onChange={setRepairSubscriptionsFromDate} />
+                  <DateFilter label="End date" value={repairSubscriptionsToDate} onChange={setRepairSubscriptionsToDate} />
+                  <button className="icon-button" title="Reset filters" type="button" onClick={resetRepairSubscriptionFilters}>↻</button>
+                  <button type="button" onClick={() => loadRepairSubscriptions(1)}>Search</button>
+                </section>
+                {repairSubscriptionsError ? <p className="dashboard-error">{repairSubscriptionsError}</p> : null}
+                <CommonTable
+                  columns={repairSubscriptionColumns}
+                  emptyText={isRepairSubscriptionsLoading ? "Loading repair subscriptions..." : "No repair subscriptions found"}
+                  isLoading={isRepairSubscriptionsLoading}
+                  pagination={repairSubscriptionsData?.pagination ? {
+                    page: repairSubscriptionsData.pagination.page,
+                    totalPages: repairSubscriptionsData.pagination.totalPages,
+                    onPrevious: () => loadRepairSubscriptions(repairSubscriptionsData.pagination!.page - 1),
+                    onNext: () => loadRepairSubscriptions(repairSubscriptionsData.pagination!.page + 1),
+                  } : undefined}
+                  rows={repairSubscriptionRows}
                 />
               </>
             ) : activeView === "Credit Repair" ? (
