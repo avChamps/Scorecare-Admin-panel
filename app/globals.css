@@ -1701,6 +1701,17 @@ select {
   align-self: end;
 }
 
+.comparison-benefit-options {
+  align-items: end;
+  display: flex;
+  gap: 24px;
+}
+
+.admin-plan-form .comparison-benefit-options .faq-checkbox {
+  display: flex;
+  padding-bottom: 10px;
+}
+
 .plans-toolbar {
   align-items: center;
   display: flex;

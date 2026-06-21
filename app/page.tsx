@@ -44,6 +44,11 @@ const menuIcons: Record<string, ReactNode> = {
       <path d="M4 11h16v9H4zM4 11a4 4 0 0 1 4-4c2 0 4 4 4 4s2-4 4-4a4 4 0 0 1 4 4M12 7v13M4 15h16" />
     </svg>
   ),
+  Services: (
+    <svg viewBox="0 0 24 24">
+      <path d="M4 7h16v12H4zM8 7V4h8v3M9 12h6M12 9v6" />
+    </svg>
+  ),
   Users: (
     <svg viewBox="0 0 24 24">
       <path d="M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8" />
@@ -149,10 +154,13 @@ const loanTypeOptions = [
   { label: "Loan Against Property", value: "loan_against_property" },
 ];
 const loanStatusOptions = ["submitted", "in_review", "approved", "rejected"];
+const creditRepairStatusOptions = ["upload_document", "submitted", "analysis", "in_progress", "resolved", "closed", "cancelled"];
+const disputeStatusOptions = ["submitted", "under_review", "resolved", "rejected", "closed", "cancelled"];
 const emptyAdminPlanForm: AdminPlanForm = {
   publicId: "",
   planName: "",
   amount: "",
+  gstPercentage: "",
   currency: "INR",
   offerTag: "",
   recommendedFor: "",
@@ -170,6 +178,26 @@ const emptyAdminPlanForm: AdminPlanForm = {
 const emptyCibilRepairContent: CibilRepairContent = {
   plans: [],
   timelines: [],
+};
+const emptyBasicPlanForm: BasicPlanForm = {
+  publicId: "",
+  planName: "",
+  amount: "",
+  gstPercentage: "",
+  razorpayPlanId: "",
+  currency: "INR",
+  offerTag: "",
+  recommendedFor: "",
+  title: "",
+  subtitle: "",
+  description: "",
+  imageUrl: "",
+  benefits: [],
+  comparisonBenefits: [],
+  buttonLabel: "Choose Basic",
+  skipLabel: "Skip",
+  displayOrder: "1",
+  isActive: true,
 };
 
 type DashboardCounts = {
@@ -227,7 +255,7 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
 
 type ManualReportType = "experian" | "cibil" | "crif";
 
@@ -244,6 +272,9 @@ const viewRoutes: Record<AppView, string> = {
   "Legal Center": "/legal-center",
   Notifications: "/notifications",
   "Plans & Benefits": "/plans-benefits",
+  "Basic Plan": "/basic-plan",
+  "Credit Repair": "/services/credit-repair",
+  Disputes: "/services/disputes",
   Users: "/users",
   Employees: "/employees",
   Roles: "/roles",
@@ -268,6 +299,9 @@ const routeViews: Record<string, AppView> = {
   "/notifications": "Notifications",
   "/faqs": "FAQs",
   "/plans-benefits": "Plans & Benefits",
+  "/basic-plan": "Basic Plan",
+  "/services/credit-repair": "Credit Repair",
+  "/services/disputes": "Disputes",
   "/feedback": "Feedback",
   "/contact-us": "Contact Us",
   "/reports/downloads": "Report Downloads",
@@ -289,6 +323,9 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   "Legal Center": { menuName: "General", childMenuName: "Legal Center" },
   Notifications: { menuName: "General", childMenuName: "Notifications" },
   "Plans & Benefits": { menuName: "Plans & Benefits", childMenuName: "Repair service" },
+  "Basic Plan": { menuName: "Plans & Benefits", childMenuName: "Basic plan" },
+  "Credit Repair": { menuName: "Services", childMenuName: "Credit Repair" },
+  Disputes: { menuName: "Services", childMenuName: "Disputes" },
   Users: { menuName: "User management", childMenuName: "Users" },
   Employees: { menuName: "Employee management", childMenuName: "Employees" },
   Roles: { menuName: "Employee management", childMenuName: "Roles" },
@@ -547,6 +584,7 @@ type SubscriptionPlan = {
   planName: string;
   billingCycle?: string | null;
   amount: number;
+  gstPercentage?: number;
   currency: string;
   offerTag: string | null;
   recommendedFor: string | null;
@@ -566,6 +604,7 @@ type AdminPlanForm = {
   publicId: string;
   planName: string;
   amount: string;
+  gstPercentage: string;
   currency: string;
   offerTag: string;
   recommendedFor: string;
@@ -579,6 +618,24 @@ type AdminPlanForm = {
   skipLabel: string;
   displayOrder: string;
   isActive: boolean;
+};
+
+type ComparisonBenefit = {
+  benefit: string;
+  free: boolean;
+  scorecarePro: boolean;
+};
+
+type BasicPlanBenefit = {
+  title: string;
+  description: string;
+};
+
+type BasicPlanForm = Omit<AdminPlanForm, "benefits" | "features"> & {
+  gstPercentage: string;
+  razorpayPlanId: string;
+  benefits: BasicPlanBenefit[];
+  comparisonBenefits: ComparisonBenefit[];
 };
 
 type CibilRepairPlan = {
@@ -810,6 +867,51 @@ type LoansResponse = {
   };
 };
 
+type ServiceRequestUser = {
+  fullName?: string;
+  mobileNumber?: string;
+  email?: string;
+  panNumber?: string;
+};
+
+type CreditRepairRequest = {
+  publicId: string;
+  user?: ServiceRequestUser | null;
+  clientId?: string | null;
+  repairStatus: string;
+  remarks?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+type DisputeRequest = {
+  publicId: string;
+  user?: ServiceRequestUser | null;
+  clientId?: string | null;
+  bureauType?: string | null;
+  disputeType?: string | null;
+  status: string;
+  remarks?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+type ServicePagination = {
+  page: number;
+  totalPages: number;
+  total: number;
+};
+
+type CreditRepairRequestsResponse = {
+  requests: CreditRepairRequest[];
+  pagination?: ServicePagination;
+};
+
+type DisputesResponse = {
+  disputes: DisputeRequest[];
+  pagination?: ServicePagination;
+};
+
 type ChatQuestionRow = {
   id: number;
   question: string;
@@ -992,6 +1094,7 @@ export default function Home() {
   const [isEmployeeManagementMenuOpen, setIsEmployeeManagementMenuOpen] = useState(false);
   const [isSubscriptionsMenuOpen, setIsSubscriptionsMenuOpen] = useState(false);
   const [isPlansBenefitsMenuOpen, setIsPlansBenefitsMenuOpen] = useState(false);
+  const [isServicesMenuOpen, setIsServicesMenuOpen] = useState(false);
   const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [activeView, setActiveView] = useState<AppView>("Dashboard");
@@ -1092,6 +1195,20 @@ export default function Home() {
   const [loansError, setLoansError] = useState("");
   const [isLoansLoading, setIsLoansLoading] = useState(false);
   const [isLoansExporting, setIsLoansExporting] = useState(false);
+  const [creditRepairData, setCreditRepairData] = useState<CreditRepairRequestsResponse | null>(null);
+  const [creditRepairError, setCreditRepairError] = useState("");
+  const [isCreditRepairLoading, setIsCreditRepairLoading] = useState(false);
+  const [selectedCreditRepair, setSelectedCreditRepair] = useState<CreditRepairRequest | null>(null);
+  const [creditRepairStatus, setCreditRepairStatus] = useState("submitted");
+  const [creditRepairRemarks, setCreditRepairRemarks] = useState("");
+  const [isUpdatingCreditRepair, setIsUpdatingCreditRepair] = useState(false);
+  const [disputesData, setDisputesData] = useState<DisputesResponse | null>(null);
+  const [disputesError, setDisputesError] = useState("");
+  const [isDisputesLoading, setIsDisputesLoading] = useState(false);
+  const [selectedDispute, setSelectedDispute] = useState<DisputeRequest | null>(null);
+  const [disputeStatus, setDisputeStatus] = useState("under_review");
+  const [disputeRemarks, setDisputeRemarks] = useState("");
+  const [isUpdatingDispute, setIsUpdatingDispute] = useState(false);
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings>({
     website: "",
     email: "",
@@ -1157,6 +1274,12 @@ export default function Home() {
   const [adminPlanForm, setAdminPlanForm] = useState<AdminPlanForm>(emptyAdminPlanForm);
   const [plansBenefitsTab, setPlansBenefitsTab] = useState<"plans" | "repair" | "benefits">("repair");
   const [isAdminPlanModalOpen, setIsAdminPlanModalOpen] = useState(false);
+  const [basicPlanForm, setBasicPlanForm] = useState<BasicPlanForm>(emptyBasicPlanForm);
+  const [basicPlanTab, setBasicPlanTab] = useState<"plan" | "benefits" | "comparison">("plan");
+  const [basicPlanError, setBasicPlanError] = useState("");
+  const [isBasicPlanLoading, setIsBasicPlanLoading] = useState(false);
+  const [isBasicPlanSaving, setIsBasicPlanSaving] = useState(false);
+  const [hasLoadedBasicPlan, setHasLoadedBasicPlan] = useState(false);
   const [cibilRepairContent, setCibilRepairContent] = useState<CibilRepairContent>(emptyCibilRepairContent);
   const [cibilRepairError, setCibilRepairError] = useState("");
   const [isCibilRepairLoading, setIsCibilRepairLoading] = useState(false);
@@ -1208,6 +1331,18 @@ export default function Home() {
     if (view === "Plans & Benefits") {
       loadAdminPlans();
       loadCibilRepairContent();
+    }
+
+    if (view === "Basic Plan") {
+      loadBasicPlan();
+    }
+
+    if (view === "Credit Repair") {
+      loadCreditRepairRequests();
+    }
+
+    if (view === "Disputes") {
+      loadDisputes();
     }
 
     if (view === "Feedback") {
@@ -1293,10 +1428,6 @@ export default function Home() {
   function getAccessForView(view: AppView, accessList = userMenuAccess) {
     const accessTarget = viewAccessMap[view];
 
-    if (view === "Plans & Benefits") {
-      return accessList.find((access) => access.menuName.toLowerCase() === accessTarget.menuName.toLowerCase());
-    }
-
     return accessList.find(
       (access) =>
         access.menuName.toLowerCase() === accessTarget.menuName.toLowerCase() &&
@@ -1308,28 +1439,12 @@ export default function Home() {
     const hasReadAccess = (permissions: string[]) =>
       permissions.some((permission) => ["view", "read"].includes(permission.toLowerCase()));
 
-    if (view === "Plans & Benefits") {
-      return accessList.some(
-        (access) =>
-          access.menuName.toLowerCase() === viewAccessMap[view].menuName.toLowerCase() &&
-          hasReadAccess(access.permissions)
-      );
-    }
-
     const access = getAccessForView(view, accessList);
 
     return Boolean(access && hasReadAccess(access.permissions));
   }
 
   function hasActionPermission(view: AppView, permission: string, accessList = userMenuAccess) {
-    if (view === "Plans & Benefits") {
-      return accessList.some(
-        (access) =>
-          access.menuName.toLowerCase() === viewAccessMap[view].menuName.toLowerCase() &&
-          access.permissions.some((item) => item.toLowerCase() === permission.toLowerCase())
-      );
-    }
-
     return Boolean(getAccessForView(view, accessList)?.permissions.some((item) => item.toLowerCase() === permission.toLowerCase()));
   }
 
@@ -2825,11 +2940,152 @@ export default function Home() {
       .filter(Boolean);
   }
 
+  function setBasicPlanFromResponse(data?: Partial<BasicPlanForm> & {
+    amount?: number | string;
+    gstPercentage?: number | string;
+    displayOrder?: number | string;
+    benefits?: BasicPlanBenefit[];
+    razorpayPlanId?: string | null;
+    imageUrl?: string | null;
+  }) {
+    if (!data) {
+      return;
+    }
+
+    setBasicPlanForm({
+      ...emptyBasicPlanForm,
+      ...data,
+      amount: String(data.amount ?? ""),
+      gstPercentage: String(data.gstPercentage ?? ""),
+      displayOrder: String(data.displayOrder ?? 1),
+      razorpayPlanId: data.razorpayPlanId || "",
+      imageUrl: data.imageUrl || "",
+      benefits: Array.isArray(data.benefits) ? data.benefits : [],
+      comparisonBenefits: Array.isArray(data.comparisonBenefits) ? data.comparisonBenefits : [],
+      isActive: data.isActive ?? true,
+    });
+  }
+
+  async function loadBasicPlan() {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setBasicPlanError("");
+      setIsBasicPlanLoading(true);
+      const response = await fetch(`${API_BASE_URL}/admin/subscription-plans`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load basic plan");
+      }
+
+      setBasicPlanFromResponse(result.data?.plans?.[0]);
+      setHasLoadedBasicPlan(true);
+    } catch (error) {
+      setBasicPlanError(error instanceof Error ? error.message : "Unable to load basic plan");
+    } finally {
+      setIsBasicPlanLoading(false);
+    }
+  }
+
+  async function saveBasicPlan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setBasicPlanError("");
+      setIsBasicPlanSaving(true);
+      const response = await fetch(`${API_BASE_URL}/admin/subscription-plans/${basicPlanForm.publicId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...basicPlanForm,
+          amount: Number(basicPlanForm.amount),
+          gstPercentage: Number(basicPlanForm.gstPercentage),
+          razorpayPlanId: basicPlanForm.razorpayPlanId || null,
+          imageUrl: basicPlanForm.imageUrl || null,
+          benefits: basicPlanForm.benefits,
+          displayOrder: Number(basicPlanForm.displayOrder),
+        }),
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to update basic plan");
+      }
+
+      setBasicPlanFromResponse(result.data?.plan || result.data);
+      showToast("success", "Basic plan updated successfully");
+      await loadBasicPlan();
+    } catch (error) {
+      setBasicPlanError(error instanceof Error ? error.message : "Unable to update basic plan");
+    } finally {
+      setIsBasicPlanSaving(false);
+    }
+  }
+
+  function updateComparisonBenefit(index: number, field: keyof ComparisonBenefit, value: string | boolean) {
+    setBasicPlanForm((plan) => ({
+      ...plan,
+      comparisonBenefits: plan.comparisonBenefits.map((benefit, benefitIndex) =>
+        benefitIndex === index ? { ...benefit, [field]: value } : benefit
+      ),
+    }));
+  }
+
+  function updateBasicPlanBenefit(index: number, field: keyof BasicPlanBenefit, value: string) {
+    setBasicPlanForm((plan) => ({
+      ...plan,
+      benefits: plan.benefits.map((benefit, benefitIndex) =>
+        benefitIndex === index ? { ...benefit, [field]: value } : benefit
+      ),
+    }));
+  }
+
+  function addComparisonBenefit() {
+    setBasicPlanForm((plan) => ({
+      ...plan,
+      comparisonBenefits: [...plan.comparisonBenefits, { benefit: "", free: false, scorecarePro: true }],
+    }));
+  }
+
+  function removeComparisonBenefit(index: number) {
+    setBasicPlanForm((plan) => ({
+      ...plan,
+      comparisonBenefits: plan.comparisonBenefits.filter((_, benefitIndex) => benefitIndex !== index),
+    }));
+  }
+
   function getAdminPlanPayload(includePublicId: boolean) {
     return {
       ...(includePublicId ? { publicId: adminPlanForm.publicId } : {}),
       planName: adminPlanForm.planName,
       amount: Number(adminPlanForm.amount),
+      gstPercentage: Number(adminPlanForm.gstPercentage),
       currency: adminPlanForm.currency,
       offerTag: adminPlanForm.offerTag,
       recommendedFor: adminPlanForm.recommendedFor || adminPlanForm.planName,
@@ -2934,6 +3190,7 @@ export default function Home() {
       publicId: plan.publicId,
       planName: plan.planName,
       amount: String(plan.amount ?? ""),
+      gstPercentage: String(plan.gstPercentage ?? ""),
       currency: plan.currency || "INR",
       offerTag: plan.offerTag || "",
       recommendedFor: plan.recommendedFor || "",
@@ -3286,6 +3543,130 @@ export default function Home() {
           : category
       )
     );
+  }
+
+  async function loadCreditRepairRequests(page = 1) {
+    if (!adminUser?.token) return;
+
+    try {
+      setCreditRepairError("");
+      setIsCreditRepairLoading(true);
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests?page=${page}&limit=20`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load credit repair requests");
+      }
+
+      const data = result.data;
+      setCreditRepairData({
+        requests: Array.isArray(data) ? data : data?.requests || data?.cibilRepairRequests || [],
+        pagination: Array.isArray(data) ? undefined : data?.pagination,
+      });
+    } catch (error) {
+      setCreditRepairError(error instanceof Error ? error.message : "Unable to load credit repair requests");
+    } finally {
+      setIsCreditRepairLoading(false);
+    }
+  }
+
+  function openCreditRepairUpdate(request: CreditRepairRequest) {
+    setSelectedCreditRepair(request);
+    setCreditRepairStatus(request.repairStatus || "submitted");
+    setCreditRepairRemarks(request.remarks || "");
+  }
+
+  async function updateCreditRepairRequest() {
+    if (!selectedCreditRepair || !adminUser?.token) return;
+
+    try {
+      setIsUpdatingCreditRepair(true);
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests/${selectedCreditRepair.publicId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ repairStatus: creditRepairStatus, remarks: creditRepairRemarks }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to update credit repair request");
+      }
+
+      setSelectedCreditRepair(null);
+      showToast("success", "Credit repair request updated successfully");
+      await loadCreditRepairRequests(creditRepairData?.pagination?.page || 1);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to update credit repair request");
+    } finally {
+      setIsUpdatingCreditRepair(false);
+    }
+  }
+
+  async function loadDisputes(page = 1) {
+    if (!adminUser?.token) return;
+
+    try {
+      setDisputesError("");
+      setIsDisputesLoading(true);
+      const response = await fetch(`${API_BASE_URL}/admin/disputes?page=${page}&limit=20`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load disputes");
+      }
+
+      const data = result.data;
+      setDisputesData({
+        disputes: Array.isArray(data) ? data : data?.disputes || [],
+        pagination: Array.isArray(data) ? undefined : data?.pagination,
+      });
+    } catch (error) {
+      setDisputesError(error instanceof Error ? error.message : "Unable to load disputes");
+    } finally {
+      setIsDisputesLoading(false);
+    }
+  }
+
+  function openDisputeUpdate(dispute: DisputeRequest) {
+    setSelectedDispute(dispute);
+    setDisputeStatus(dispute.status || "under_review");
+    setDisputeRemarks(dispute.remarks || "");
+  }
+
+  async function updateDispute() {
+    if (!selectedDispute || !adminUser?.token) return;
+
+    try {
+      setIsUpdatingDispute(true);
+      const response = await fetch(`${API_BASE_URL}/admin/disputes/${selectedDispute.publicId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: disputeStatus, remarks: disputeRemarks }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to update dispute");
+      }
+
+      setSelectedDispute(null);
+      showToast("success", "Dispute updated successfully");
+      await loadDisputes(disputesData?.pagination?.page || 1);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to update dispute");
+    } finally {
+      setIsUpdatingDispute(false);
+    }
   }
 
   async function loadLoans(page = 1, search = loansSearch, status = loansStatus) {
@@ -3713,7 +4094,8 @@ export default function Home() {
       setIsUserManagementMenuOpen(routeView === "Users");
       setIsEmployeeManagementMenuOpen(routeView === "Employees" || routeView === "Roles");
       setIsSubscriptionsMenuOpen(routeView === "Subscriptions");
-      setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits");
+      setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits" || routeView === "Basic Plan");
+      setIsServicesMenuOpen(routeView === "Credit Repair" || routeView === "Disputes");
       setIsReportsMenuOpen(routeView === "Report Downloads" || routeView === "Download CIBIL" || routeView === "Manual Report");
 
       if (routeView === "Plans & Benefits") {
@@ -3772,6 +4154,12 @@ export default function Home() {
       loadAdminPlans();
     }
   }, [activeView, adminUser?.token, hasLoadedAdminPlans, isAdminPlansLoading]);
+
+  useEffect(() => {
+    if (activeView === "Basic Plan" && adminUser?.token && !hasLoadedBasicPlan && !isBasicPlanLoading) {
+      loadBasicPlan();
+    }
+  }, [activeView, adminUser?.token, hasLoadedBasicPlan, isBasicPlanLoading]);
 
   useEffect(() => {
     if (activeView === "Plans & Benefits" && adminUser?.token && plansBenefitsTab === "repair" && !hasLoadedCibilRepair && !isCibilRepairLoading) {
@@ -3850,6 +4238,18 @@ export default function Home() {
       loadLoans();
     }
   }, [activeView, adminUser?.token, loansData, isLoansLoading]);
+
+  useEffect(() => {
+    if (activeView === "Credit Repair" && adminUser?.token && !creditRepairData && !isCreditRepairLoading) {
+      loadCreditRepairRequests();
+    }
+  }, [activeView, adminUser?.token, creditRepairData, isCreditRepairLoading]);
+
+  useEffect(() => {
+    if (activeView === "Disputes" && adminUser?.token && !disputesData && !isDisputesLoading) {
+      loadDisputes();
+    }
+  }, [activeView, adminUser?.token, disputesData, isDisputesLoading]);
 
   useEffect(() => {
     if (activeView === "Chats" && adminUser?.token && !chatsData && !isChatsLoading) {
@@ -4179,6 +4579,9 @@ export default function Home() {
     const canCreatePlans = hasActionPermission("Plans & Benefits", "create");
     const canUpdatePlans = hasActionPermission("Plans & Benefits", "update");
     const canDeletePlans = hasActionPermission("Plans & Benefits", "delete");
+    const canUpdateBasicPlan = hasActionPermission("Basic Plan", "update");
+    const canUpdateCreditRepair = hasActionPermission("Credit Repair", "update");
+    const canUpdateDisputes = hasActionPermission("Disputes", "update");
     const canCreateManualReport = hasActionPermission("Manual Report", "create");
     const canExportUsers = hasActionPermission("Users", "export");
     const canCreateEmployees = hasActionPermission("Employees", "create");
@@ -4467,6 +4870,36 @@ export default function Home() {
         ]
         : []),
     ]) ?? [];
+    const creditRepairColumns = ["User", "Mobile", "Client ID", "Status", "Remarks", "Created At", ...(canUpdateCreditRepair ? ["Action"] : [])];
+    const creditRepairRows = creditRepairData?.requests.map((request) => [
+      request.user?.fullName || "-",
+      request.user?.mobileNumber || "-",
+      request.clientId || "-",
+      formatLabel(request.repairStatus),
+      request.remarks || "-",
+      formatDate(request.createdAt || null),
+      ...(canUpdateCreditRepair ? [
+        <button className="table-action" type="button" onClick={() => openCreditRepairUpdate(request)}>
+          <ActionIcon type="edit" />Update
+        </button>,
+      ] : []),
+    ]) ?? [];
+    const disputeColumns = ["User", "Mobile", "Client ID", "Bureau", "Dispute Type", "Status", "Remarks", "Created At", ...(canUpdateDisputes ? ["Action"] : [])];
+    const disputeRows = disputesData?.disputes.map((dispute) => [
+      dispute.user?.fullName || "-",
+      dispute.user?.mobileNumber || "-",
+      dispute.clientId || "-",
+      dispute.bureauType || "-",
+      dispute.disputeType || "-",
+      formatLabel(dispute.status),
+      dispute.remarks || "-",
+      formatDate(dispute.createdAt || null),
+      ...(canUpdateDisputes ? [
+        <button className="table-action" type="button" onClick={() => openDisputeUpdate(dispute)}>
+          <ActionIcon type="edit" />Update
+        </button>,
+      ] : []),
+    ]) ?? [];
     const chatColumns = ["User", "Mobile", "PAN", "Question ID", "Question", "Created At"];
     const chatRows = chatsData?.users?.flatMap((user) =>
       user.questions.map((question) => [
@@ -4585,8 +5018,8 @@ export default function Home() {
                         ) : null}
                       </div>
                     ) : null}
-                    {hasViewPermission("Plans & Benefits") ? (
-                      <div className={`sidebar-group ${activeView === "Plans & Benefits" ? "active" : ""}`}>
+                    {hasViewPermission("Plans & Benefits") || hasViewPermission("Basic Plan") ? (
+                      <div className={`sidebar-group ${activeView === "Plans & Benefits" || activeView === "Basic Plan" ? "active" : ""}`}>
                         <button className="sidebar-group-toggle" type="button" onClick={() => setIsPlansBenefitsMenuOpen((current) => !current)}>
                           <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
                           Plans & Benefits
@@ -4594,10 +5027,33 @@ export default function Home() {
                         </button>
                         {isPlansBenefitsMenuOpen ? (
                           <div className="sidebar-submenu">
-                            <button className={activeView === "Plans & Benefits" && plansBenefitsTab === "repair" ? "active" : ""} type="button" onClick={() => openPlansBenefitsTab("repair")}>
-                              <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
-                              Repair service
-                            </button>
+                            {hasViewPermission("Plans & Benefits") ? (
+                              <button className={activeView === "Plans & Benefits" && plansBenefitsTab === "repair" ? "active" : ""} type="button" onClick={() => openPlansBenefitsTab("repair")}>
+                                <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
+                                Repair service
+                              </button>
+                            ) : null}
+                            {hasViewPermission("Basic Plan") ? (
+                              <button className={activeView === "Basic Plan" ? "active" : ""} type="button" onClick={() => openAdminView("Basic Plan")}>
+                                <span className="menu-icon">{menuIcons["Plans & Benefits"]}</span>
+                                Basic plan
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {hasViewPermission("Credit Repair") || hasViewPermission("Disputes") ? (
+                      <div className={`sidebar-group ${activeView === "Credit Repair" || activeView === "Disputes" ? "active" : ""}`}>
+                        <button className="sidebar-group-toggle" type="button" onClick={() => setIsServicesMenuOpen((current) => !current)}>
+                          <span className="menu-icon">{menuIcons.Services}</span>
+                          Services
+                          <span className="sidebar-chevron">{isServicesMenuOpen ? "⌄" : "›"}</span>
+                        </button>
+                        {isServicesMenuOpen ? (
+                          <div className="sidebar-submenu">
+                            {hasViewPermission("Credit Repair") ? <button className={activeView === "Credit Repair" ? "active" : ""} type="button" onClick={() => openAdminView("Credit Repair")}><span className="menu-icon">{menuIcons.Services}</span>Credit Repair</button> : null}
+                            {hasViewPermission("Disputes") ? <button className={activeView === "Disputes" ? "active" : ""} type="button" onClick={() => openAdminView("Disputes")}><span className="menu-icon">{menuIcons.Services}</span>Disputes</button> : null}
                           </div>
                         ) : null}
                       </div>
@@ -5108,6 +5564,96 @@ export default function Home() {
                   ))}
                 </form>
               </>
+            ) : activeView === "Basic Plan" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Basic Plan</h2>
+                    <p>Manage the basic plan, benefits, and comparison benefits</p>
+                  </div>
+                </section>
+
+                <div className="section-tabs">
+                  <button className={basicPlanTab === "plan" ? "active" : ""} type="button" onClick={() => setBasicPlanTab("plan")}>Plans</button>
+                  <button className={basicPlanTab === "benefits" ? "active" : ""} type="button" onClick={() => setBasicPlanTab("benefits")}>Benefits</button>
+                  <button className={basicPlanTab === "comparison" ? "active" : ""} type="button" onClick={() => setBasicPlanTab("comparison")}>Comparison Benefits</button>
+                </div>
+
+                {basicPlanError ? <p className="dashboard-error">{basicPlanError}</p> : null}
+
+                <form className="admin-plan-form panel" onSubmit={saveBasicPlan}>
+                  {isBasicPlanLoading ? (
+                    <div className="plan-loading">
+                      <span className="table-loader" />
+                      Loading basic plan...
+                    </div>
+                  ) : basicPlanTab === "plan" ? (
+                    <div className="admin-plan-grid">
+                      <label>
+                        Amount
+                        <input required min={0} type="number" value={basicPlanForm.amount} onChange={(event) => setBasicPlanForm((plan) => ({ ...plan, amount: event.target.value }))} />
+                      </label>
+                      <label>
+                        GST Percentage
+                        <input required min={0} type="number" value={basicPlanForm.gstPercentage} onChange={(event) => setBasicPlanForm((plan) => ({ ...plan, gstPercentage: event.target.value }))} />
+                      </label>
+                      <label>
+                        Offer Tag
+                        <input value={basicPlanForm.offerTag} onChange={(event) => setBasicPlanForm((plan) => ({ ...plan, offerTag: event.target.value }))} />
+                      </label>
+                    </div>
+                  ) : basicPlanTab === "benefits" ? (
+                    <div className="repair-content-list">
+                      {basicPlanForm.benefits.map((benefit, index) => (
+                        <section className="repair-content-card" key={`basic-plan-benefit-${index}`}>
+                          <div className="admin-plan-grid">
+                            <label>
+                              Title
+                              <input required value={benefit.title} onChange={(event) => updateBasicPlanBenefit(index, "title", event.target.value)} />
+                            </label>
+                            <label>
+                              Description
+                              <textarea required value={benefit.description} onChange={(event) => updateBasicPlanBenefit(index, "description", event.target.value)} />
+                            </label>
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="admin-plan-form-header">
+                        <h3>Comparison Benefits</h3>
+                        {canUpdateBasicPlan ? <button type="button" onClick={addComparisonBenefit}><ActionIcon type="add" />Add Benefit</button> : null}
+                      </div>
+                      {basicPlanForm.comparisonBenefits.map((benefit, index) => (
+                        <section className="repair-content-card" key={`comparison-benefit-${index}`}>
+                          <div className="admin-plan-grid">
+                            <label>
+                              Benefit
+                              <input required value={benefit.benefit} onChange={(event) => updateComparisonBenefit(index, "benefit", event.target.value)} />
+                            </label>
+                            <div className="comparison-benefit-options">
+                              <label className="faq-checkbox">
+                                <input checked={benefit.free} type="checkbox" onChange={(event) => updateComparisonBenefit(index, "free", event.target.checked)} />
+                                Free
+                              </label>
+                              <label className="faq-checkbox">
+                                <input checked={benefit.scorecarePro} type="checkbox" onChange={(event) => updateComparisonBenefit(index, "scorecarePro", event.target.checked)} />
+                                ScoreCare Pro
+                              </label>
+                            </div>
+                          </div>
+                          {canUpdateBasicPlan ? <button className="table-action danger-action" type="button" onClick={() => removeComparisonBenefit(index)}><ActionIcon type="delete" />Remove</button> : null}
+                        </section>
+                      ))}
+                    </>
+                  )}
+
+                  <footer className="modal-actions">
+                    <button disabled={isBasicPlanLoading || isBasicPlanSaving} type="submit">{isBasicPlanSaving ? "Updating..." : "Update"}</button>
+                  </footer>
+                </form>
+              </>
             ) : activeView === "Plans & Benefits" ? (
               <>
                 <section className="welcome-panel">
@@ -5202,8 +5748,10 @@ export default function Home() {
                               <strong>{plan.currency} {plan.amount}</strong>
                             </div>
                             <div className="admin-plan-badges">
+                              <span>Amount: {plan.currency} {plan.amount}</span>
+                              <span>GST: {plan.gstPercentage ?? 0}%</span>
                               {plan.billingCycle ? <span>{formatLabel(plan.billingCycle)}</span> : null}
-                              {plan.offerTag ? <span>{plan.offerTag}</span> : null}
+                              {plan.offerTag ? <span>Offer: {plan.offerTag}</span> : null}
                               <span>Order {plan.displayOrder ?? "-"}</span>
                             </div>
                             <p>{plan.recommendedFor || plan.description || "-"}</p>
@@ -6044,6 +6592,46 @@ export default function Home() {
                   rows={subscriptionRows}
                 />
               </>
+            ) : activeView === "Credit Repair" ? (
+              <>
+                <section className="welcome-panel">
+                  <div><h2>Credit Repair</h2><p>Review and update credit repair requests</p></div>
+                  <span>{creditRepairData?.pagination?.total ?? creditRepairData?.requests.length ?? 0} requests</span>
+                </section>
+                {creditRepairError ? <p className="dashboard-error">{creditRepairError}</p> : null}
+                <CommonTable
+                  columns={creditRepairColumns}
+                  emptyText={isCreditRepairLoading ? "Loading credit repair requests..." : "No credit repair requests found"}
+                  isLoading={isCreditRepairLoading}
+                  pagination={creditRepairData?.pagination ? {
+                    page: creditRepairData.pagination.page,
+                    totalPages: creditRepairData.pagination.totalPages,
+                    onPrevious: () => loadCreditRepairRequests(creditRepairData.pagination!.page - 1),
+                    onNext: () => loadCreditRepairRequests(creditRepairData.pagination!.page + 1),
+                  } : undefined}
+                  rows={creditRepairRows}
+                />
+              </>
+            ) : activeView === "Disputes" ? (
+              <>
+                <section className="welcome-panel">
+                  <div><h2>Disputes</h2><p>Review and update raised disputes</p></div>
+                  <span>{disputesData?.pagination?.total ?? disputesData?.disputes.length ?? 0} disputes</span>
+                </section>
+                {disputesError ? <p className="dashboard-error">{disputesError}</p> : null}
+                <CommonTable
+                  columns={disputeColumns}
+                  emptyText={isDisputesLoading ? "Loading disputes..." : "No disputes found"}
+                  isLoading={isDisputesLoading}
+                  pagination={disputesData?.pagination ? {
+                    page: disputesData.pagination.page,
+                    totalPages: disputesData.pagination.totalPages,
+                    onPrevious: () => loadDisputes(disputesData.pagination!.page - 1),
+                    onNext: () => loadDisputes(disputesData.pagination!.page + 1),
+                  } : undefined}
+                  rows={disputeRows}
+                />
+              </>
             ) : activeView === "Loans" ? (
               <>
                 <section className="welcome-panel">
@@ -6687,6 +7275,16 @@ export default function Home() {
                     />
                   </label>
                   <label>
+                    GST Percentage
+                    <input
+                      required
+                      min={0}
+                      type="number"
+                      value={adminPlanForm.gstPercentage}
+                      onChange={(event) => setAdminPlanForm((plan) => ({ ...plan, gstPercentage: event.target.value }))}
+                    />
+                  </label>
+                  <label>
                     Offer Tag
                     <input
                       value={adminPlanForm.offerTag}
@@ -6804,6 +7402,54 @@ export default function Home() {
                     {isUpdatingPlan ? "Updating..." : "Submit"}
                   </button>
                 ) : null}
+              </footer>
+            </section>
+          </div>
+        ) : null}
+        {selectedCreditRepair ? (
+          <div className="modal-backdrop">
+            <section className="plan-modal">
+              <header>
+                <div><h3>Update Credit Repair</h3><p>{selectedCreditRepair.user?.fullName || selectedCreditRepair.clientId || "Request"}</p></div>
+                <button type="button" onClick={() => setSelectedCreditRepair(null)}>×</button>
+              </header>
+              <label className="amount-field">
+                Status
+                <select value={creditRepairStatus} onChange={(event) => setCreditRepairStatus(event.target.value)}>
+                  {creditRepairStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                </select>
+              </label>
+              <label className="amount-field">
+                Remarks
+                <textarea value={creditRepairRemarks} onChange={(event) => setCreditRepairRemarks(event.target.value)} />
+              </label>
+              <footer className="modal-actions">
+                <button type="button" onClick={() => setSelectedCreditRepair(null)}>Cancel</button>
+                <button disabled={isUpdatingCreditRepair} type="button" onClick={updateCreditRepairRequest}>{isUpdatingCreditRepair ? "Updating..." : "Submit"}</button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
+        {selectedDispute ? (
+          <div className="modal-backdrop">
+            <section className="plan-modal">
+              <header>
+                <div><h3>Update Dispute</h3><p>{selectedDispute.user?.fullName || selectedDispute.clientId || "Dispute"}</p></div>
+                <button type="button" onClick={() => setSelectedDispute(null)}>×</button>
+              </header>
+              <label className="amount-field">
+                Status
+                <select value={disputeStatus} onChange={(event) => setDisputeStatus(event.target.value)}>
+                  {disputeStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                </select>
+              </label>
+              <label className="amount-field">
+                Remarks
+                <textarea value={disputeRemarks} onChange={(event) => setDisputeRemarks(event.target.value)} />
+              </label>
+              <footer className="modal-actions">
+                <button type="button" onClick={() => setSelectedDispute(null)}>Cancel</button>
+                <button disabled={isUpdatingDispute} type="button" onClick={updateDispute}>{isUpdatingDispute ? "Updating..." : "Submit"}</button>
               </footer>
             </section>
           </div>
