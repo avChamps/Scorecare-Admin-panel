@@ -260,7 +260,7 @@ type AdminUser = {
   isAdmin?: boolean;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Users" | "Employees" | "Roles" | "Subscriptions" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Basic Subscriptions" | "Repair Subscriptions" | "Users" | "Employees" | "Roles" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
 
 type ManualReportType = "experian" | "cibil" | "crif";
 
@@ -285,7 +285,8 @@ const viewRoutes: Record<AppView, string> = {
   Users: "/users",
   Employees: "/employees",
   Roles: "/roles",
-  Subscriptions: "/subscriptions",
+  "Basic Subscriptions": "/subscriptions",
+  "Repair Subscriptions": "/subscriptions/repair",
   Loans: "/loans",
   Chats: "/chat",
   FAQs: "/faqs",
@@ -320,7 +321,8 @@ const routeViews: Record<string, AppView> = {
   "/users": "Users",
   "/employees": "Employees",
   "/roles": "Roles",
-  "/subscriptions": "Subscriptions",
+  "/subscriptions": "Basic Subscriptions",
+  "/subscriptions/repair": "Repair Subscriptions",
   "/loans": "Loans",
   "/chat": "Chats",
 };
@@ -340,7 +342,8 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   Users: { menuName: "User management", childMenuName: "Users" },
   Employees: { menuName: "Employee management", childMenuName: "Employees" },
   Roles: { menuName: "Employee management", childMenuName: "Roles" },
-  Subscriptions: { menuName: "Subscriptions", childMenuName: "Subscriptions" },
+  "Basic Subscriptions": { menuName: "Subscriptions", childMenuName: "Basic Subscriptions" },
+  "Repair Subscriptions": { menuName: "Subscriptions", childMenuName: "Repair Subscriptions" },
   Loans: { menuName: "Loans", childMenuName: null },
   Chats: { menuName: "Chats", childMenuName: null },
   FAQs: { menuName: "General", childMenuName: "FAQ" },
@@ -1456,8 +1459,12 @@ export default function Home() {
       loadContactRequests();
     }
 
-    if (view === "Users" || view === "Subscriptions") {
-      loadUsers(1, usersSearch, view === "Subscriptions");
+    if (view === "Users" || view === "Basic Subscriptions") {
+      loadUsers(1, usersSearch, view === "Basic Subscriptions");
+    }
+
+    if (view === "Repair Subscriptions") {
+      loadRepairSubscriptions();
     }
 
     if (view === "Report Downloads") {
@@ -1628,7 +1635,7 @@ export default function Home() {
     }
   }
 
-  async function loadUsers(page = 1, search = usersSearch, subscribedOnly = activeView === "Subscriptions") {
+  async function loadUsers(page = 1, search = usersSearch, subscribedOnly = activeView === "Basic Subscriptions") {
     if (!adminUser?.token) {
       return;
     }
@@ -4286,7 +4293,7 @@ export default function Home() {
       setIsGeneralMenuOpen(["General", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].includes(routeView));
       setIsUserManagementMenuOpen(routeView === "Users");
       setIsEmployeeManagementMenuOpen(routeView === "Employees" || routeView === "Roles");
-      setIsSubscriptionsMenuOpen(routeView === "Subscriptions");
+      setIsSubscriptionsMenuOpen(routeView === "Basic Subscriptions" || routeView === "Repair Subscriptions");
       setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits" || routeView === "Basic Plan");
       setIsServicesMenuOpen(routeView === "Credit Repair" || routeView === "Disputes");
       setIsRevenueMenuOpen(routeView === "Basic Subscription" || routeView === "Repair Service Subscription");
@@ -4371,7 +4378,7 @@ export default function Home() {
   }, [cibilRepairContent.timelines.length]);
 
   useEffect(() => {
-    if ((activeView === "Users" || activeView === "Subscriptions") && adminUser?.token && !usersData && !isUsersLoading) {
+    if ((activeView === "Users" || activeView === "Basic Subscriptions") && adminUser?.token && !usersData && !isUsersLoading) {
       loadUsers();
     }
   }, [activeView, adminUser?.token, usersData, isUsersLoading]);
@@ -4452,7 +4459,7 @@ export default function Home() {
   }, [activeView, adminUser?.token, basicSubscriptionsData, isBasicSubscriptionsLoading]);
 
   useEffect(() => {
-    if (activeView === "Repair Service Subscription" && adminUser?.token && !repairSubscriptionsData && !isRepairSubscriptionsLoading) {
+    if ((activeView === "Repair Service Subscription" || activeView === "Repair Subscriptions") && adminUser?.token && !repairSubscriptionsData && !isRepairSubscriptionsLoading) {
       loadRepairSubscriptions();
     }
   }, [activeView, adminUser?.token, repairSubscriptionsData, isRepairSubscriptionsLoading]);
@@ -4796,7 +4803,7 @@ export default function Home() {
     const canCreateRoles = hasActionPermission("Roles", "create");
     const canUpdateRoles = hasActionPermission("Roles", "update");
     const canDeleteRoles = hasActionPermission("Roles", "delete");
-    const canUpdateSubscriptions = hasActionPermission("Subscriptions", "update");
+    const canUpdateSubscriptions = hasActionPermission("Basic Subscriptions", "update");
     const canExportLoans = hasActionPermission("Loans", "export");
     const canUpdateLoans = hasActionPermission("Loans", "update");
     const usersColumns = ["Name", "Mobile", "Email", "Access", "Subscription", "Started At", "Due At", "Credit Score", "Messages", "Loans", "Status"];
@@ -5293,8 +5300,8 @@ export default function Home() {
                         ) : null}
                       </div>
                     ) : null}
-                    {hasViewPermission("Subscriptions") ? (
-                      <div className={`sidebar-group ${activeView === "Subscriptions" ? "active" : ""}`}>
+                    {hasViewPermission("Basic Subscriptions") || hasViewPermission("Repair Subscriptions") ? (
+                      <div className={`sidebar-group ${activeView === "Basic Subscriptions" || activeView === "Repair Subscriptions" ? "active" : ""}`}>
                         <button className="sidebar-group-toggle" type="button" onClick={() => setIsSubscriptionsMenuOpen((current) => !current)}>
                           <span className="menu-icon">{menuIcons.Subscriptions}</span>
                           Subscriptions
@@ -5302,10 +5309,8 @@ export default function Home() {
                         </button>
                         {isSubscriptionsMenuOpen ? (
                           <div className="sidebar-submenu">
-                            <button className={activeView === "Subscriptions" ? "active" : ""} type="button" onClick={() => openAdminView("Subscriptions")}>
-                              <span className="menu-icon">{menuIcons.Subscriptions}</span>
-                              Subscriptions
-                            </button>
+                            {hasViewPermission("Basic Subscriptions") ? <button className={activeView === "Basic Subscriptions" ? "active" : ""} type="button" onClick={() => openAdminView("Basic Subscriptions")}><span className="menu-icon">{menuIcons.Subscriptions}</span>Basic Subscriptions</button> : null}
+                            {hasViewPermission("Repair Subscriptions") ? <button className={activeView === "Repair Subscriptions" ? "active" : ""} type="button" onClick={() => openAdminView("Repair Subscriptions")}><span className="menu-icon">{menuIcons.Subscriptions}</span>Repair Subscriptions</button> : null}
                           </div>
                         ) : null}
                       </div>
@@ -6848,12 +6853,12 @@ export default function Home() {
                   </>
                 )}
               </>
-            ) : activeView === "Subscriptions" ? (
+            ) : activeView === "Basic Subscriptions" ? (
               <>
                 <section className="welcome-panel">
                   <div>
-                    <h2>Subscriptions</h2>
-                    <p>Manage user subscription plans</p>
+                    <h2>Basic Subscriptions</h2>
+                    <p>Manage basic user subscriptions</p>
                   </div>
                   <span>{usersData?.pagination.total ?? 0} records</span>
                 </section>
@@ -6933,10 +6938,10 @@ export default function Home() {
                   rows={basicSubscriptionRows}
                 />
               </>
-            ) : activeView === "Repair Service Subscription" ? (
+            ) : activeView === "Repair Service Subscription" || activeView === "Repair Subscriptions" ? (
               <>
                 <section className="welcome-panel">
-                  <div><h2>Repair Service Subscriptions</h2><p>Review credit repair subscription revenue</p></div>
+                  <div><h2>Repair Subscriptions</h2><p>Review credit repair subscriptions</p></div>
                   <span>{repairSubscriptionsData?.pagination?.total ?? repairSubscriptionsData?.requests.length ?? 0} subscriptions</span>
                 </section>
                 <div className="mobile-toolbar-actions"><button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>Filter</button></div>
