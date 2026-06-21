@@ -402,7 +402,8 @@ select {
   align-items: center;
   background: transparent;
   border-radius: 10px;
-  color: #536071;
+  /* color: #536071; */
+  color: black;
   display: flex;
   font-size: 14px;
   font-weight: 700;
