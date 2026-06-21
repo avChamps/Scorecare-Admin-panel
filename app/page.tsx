@@ -1,8 +1,9 @@
 "use client";
 
-import { ClipboardEvent, FormEvent, Fragment, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { ClipboardEvent, FormEvent, Fragment, KeyboardEvent, UIEvent, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Bar,
   BarChart,
@@ -258,9 +259,10 @@ type AdminUser = {
   email?: string;
   mobileNumber?: string;
   isAdmin?: boolean;
+  loginEventId?: string;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Basic Subscriptions" | "Repair Subscriptions" | "Users" | "Employees" | "Roles" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
+type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Basic Subscriptions" | "Repair Subscriptions" | "Users" | "Employees" | "Roles" | "Login History" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
 
 type ManualReportType = "experian" | "cibil" | "crif";
 
@@ -285,6 +287,7 @@ const viewRoutes: Record<AppView, string> = {
   Users: "/users",
   Employees: "/employees",
   Roles: "/roles",
+  "Login History": "/login-history",
   "Basic Subscriptions": "/subscriptions",
   "Repair Subscriptions": "/subscriptions/repair",
   Loans: "/loans",
@@ -321,6 +324,7 @@ const routeViews: Record<string, AppView> = {
   "/users": "Users",
   "/employees": "Employees",
   "/roles": "Roles",
+  "/login-history": "Login History",
   "/subscriptions": "Basic Subscriptions",
   "/subscriptions/repair": "Repair Subscriptions",
   "/loans": "Loans",
@@ -342,6 +346,7 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   Users: { menuName: "User management", childMenuName: "Users" },
   Employees: { menuName: "Employee management", childMenuName: "Employees" },
   Roles: { menuName: "Employee management", childMenuName: "Roles" },
+  "Login History": { menuName: "Employee management", childMenuName: "Login History" },
   "Basic Subscriptions": { menuName: "Subscriptions", childMenuName: "Basic Subscriptions" },
   "Repair Subscriptions": { menuName: "Subscriptions", childMenuName: "Repair Subscriptions" },
   Loans: { menuName: "Loans", childMenuName: null },
@@ -842,6 +847,34 @@ type EmployeeRolesResponse = {
   };
 };
 
+type EmployeeLoginEvent = {
+  publicId?: string;
+  id?: string | number;
+  employeeCode?: string;
+  employeeName?: string;
+  fullName?: string;
+  email?: string;
+  mobileNumber?: string;
+  role?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  loginAt?: string;
+  loggedInAt?: string;
+  logoutAt?: string | null;
+  loggedOutAt?: string | null;
+  createdAt?: string;
+};
+
+type EmployeeLoginEventsResponse = {
+  loginEvents: EmployeeLoginEvent[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 type EmployeeRoleForm = {
   roleName: string;
   description: string;
@@ -1075,9 +1108,13 @@ type ContactRequestsResponse = {
 };
 
 type AdminNotificationRow = {
-  id?: number;
+  id?: number | string;
+  publicId?: string;
   title?: string;
   message?: string;
+  type?: string;
+  isRead?: boolean;
+  readAt?: string | null;
   scope?: string;
   screen?: string;
   data?: {
@@ -1096,6 +1133,7 @@ type AdminNotificationRow = {
 
 type AdminNotificationsResponse = {
   notifications: AdminNotificationRow[];
+  unreadCount?: number;
   pagination: {
     page: number;
     limit: number;
@@ -1153,9 +1191,12 @@ type FaqCategory = {
 export default function Home() {
   const pathname = usePathname();
   const router = useRouter();
-  const [step, setStep] = useState<"mobile" | "otp" | "admin">("mobile");
+  const [step, setStep] = useState<"mobile" | "otp" | "authenticator" | "admin">("mobile");
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
+  const [authenticatorCode, setAuthenticatorCode] = useState("");
+  const [mfaToken, setMfaToken] = useState("");
+  const [authenticatorSetup, setAuthenticatorSetup] = useState<{ secret: string; otpauthUrl: string } | null>(null);
   const [resendSeconds, setResendSeconds] = useState(45);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
@@ -1247,6 +1288,10 @@ export default function Home() {
   const [editingEmployeeRoleId, setEditingEmployeeRoleId] = useState<string | null>(null);
   const [expandedEmployeeRoleAccess, setExpandedEmployeeRoleAccess] = useState<string[]>([]);
   const [deletingEmployeeRole, setDeletingEmployeeRole] = useState<EmployeeRole | null>(null);
+  const [loginEventsData, setLoginEventsData] = useState<EmployeeLoginEventsResponse | null>(null);
+  const [loginEventsSearch, setLoginEventsSearch] = useState("");
+  const [loginEventsError, setLoginEventsError] = useState("");
+  const [isLoginEventsLoading, setIsLoginEventsLoading] = useState(false);
   const [employeeRoleForm, setEmployeeRoleForm] = useState<EmployeeRoleForm>({
     roleName: "",
     description: "",
@@ -1352,11 +1397,14 @@ export default function Home() {
   const [notificationScreen, setNotificationScreen] = useState("home");
   const [notificationsTab, setNotificationsTab] = useState<"notifications" | "users">("notifications");
   const [notificationsSearch, setNotificationsSearch] = useState("");
+  const [isNotificationsDrawerOpen, setIsNotificationsDrawerOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [notificationModalScope, setNotificationModalScope] = useState<"all" | "users">("all");
   const [notificationsData, setNotificationsData] = useState<AdminNotificationsResponse | null>(null);
   const [notificationsError, setNotificationsError] = useState("");
   const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+  const [isNotificationsPaging, setIsNotificationsPaging] = useState(false);
+  const [isNotificationMarking, setIsNotificationMarking] = useState(false);
   const [isNotificationSending, setIsNotificationSending] = useState(false);
   const [faqCategories, setFaqCategories] = useState<FaqCategory[]>([]);
   const [faqsError, setFaqsError] = useState("");
@@ -1422,8 +1470,8 @@ export default function Home() {
     }
 
     if (view === "Notifications") {
-      loadNotificationUsers();
-      loadAdminNotifications();
+      setNotificationsTab("notifications");
+      loadAdminNotifications(1);
     }
 
     if (view === "Plans & Benefits") {
@@ -1489,6 +1537,10 @@ export default function Home() {
       loadEmployeeMenuAccess();
     }
 
+    if (view === "Login History") {
+      loadLoginEvents();
+    }
+
     if (view === "Loans") {
       loadLoans();
     }
@@ -1546,6 +1598,10 @@ export default function Home() {
   }
 
   function hasViewPermission(view: AppView, accessList = userMenuAccess) {
+    if (view === "Notifications") {
+      return true;
+    }
+
     const hasReadAccess = (permissions: string[]) =>
       permissions.some((permission) => ["view", "read"].includes(permission.toLowerCase()));
 
@@ -1741,7 +1797,7 @@ export default function Home() {
       const bureauType = filters.bureauType ?? apiLogsBureauType;
       const operationType = filters.operationType ?? apiLogsOperationType;
       const status = filters.status ?? apiLogsStatus;
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
+      const params = new URLSearchParams({ page: String(page), limit: "10" });
 
       if (search) params.set("search", search);
       if (bureauType) params.set("bureauType", bureauType);
@@ -1852,7 +1908,7 @@ export default function Home() {
     try {
       setManualReportDownloadsError("");
       setIsManualReportDownloadsLoading(true);
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
+      const params = new URLSearchParams({ page: String(page), limit: "10" });
 
       if (search) params.set("search", search);
       if (type) params.set("type", type);
@@ -2059,6 +2115,39 @@ export default function Home() {
       setEmployeeMenuAccess(Array.isArray(result.data) ? result.data : result.data?.menuAccess || []);
     } catch (error) {
       setEmployeeRolesError(error instanceof Error ? error.message : "Unable to load menu access");
+    }
+  }
+
+  async function loadLoginEvents(page = 1, search = loginEventsSearch) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setLoginEventsError("");
+      setIsLoginEventsLoading(true);
+      const params = new URLSearchParams({ page: String(page), limit: "10" });
+      if (search.trim()) {
+        params.set("search", search.trim());
+      }
+      const response = await fetch(`${API_BASE_URL}/admin/login-events?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load login history");
+      }
+
+      const data = result.data || {};
+      setLoginEventsData({
+        loginEvents: data.loginEvents || data.events || data.login_events || (Array.isArray(data) ? data : []),
+        pagination: data.pagination || { page, limit: 10, total: 0, totalPages: 1 },
+      });
+    } catch (error) {
+      setLoginEventsError(error instanceof Error ? error.message : "Unable to load login history");
+    } finally {
+      setIsLoginEventsLoading(false);
     }
   }
 
@@ -2542,21 +2631,26 @@ export default function Home() {
     }
   }
 
-  async function loadAdminNotifications(page = 1, search = notificationsSearch) {
+  async function loadAdminNotifications(page = 1, search = notificationsSearch, append = false) {
     if (!adminUser?.token) {
       return;
     }
 
     try {
       setNotificationsError("");
+      if (append) {
+        setIsNotificationsPaging(true);
+      } else {
+        setIsNotificationsLoading(true);
+      }
       const params = new URLSearchParams({
         page: String(page),
-        limit: "20",
-        search,
-        from: "",
-        totime: "",
+        limit: "10",
       });
-      const response = await fetch(`${API_BASE_URL}/admin/app-notifications?${params.toString()}`, {
+      if (search.trim()) {
+        params.set("search", search.trim());
+      }
+      const response = await fetch(`${API_BASE_URL}/admin/notifications?${params.toString()}`, {
         headers: { Authorization: `Bearer ${adminUser.token}` },
       });
       const result = await response.json();
@@ -2572,9 +2666,96 @@ export default function Home() {
         throw new Error(result.message || "Unable to load notifications");
       }
 
-      setNotificationsData(result.data);
+      setNotificationsData((current) => {
+        if (!append || !current) {
+          return result.data;
+        }
+
+        const existingIds = new Set(current.notifications.map((notification) => notification.publicId || notification.id));
+        const nextNotifications = result.data.notifications.filter(
+          (notification: AdminNotificationRow) => !existingIds.has(notification.publicId || notification.id)
+        );
+
+        return {
+          ...result.data,
+          notifications: [...current.notifications, ...nextNotifications],
+        };
+      });
     } catch (error) {
       setNotificationsError(error instanceof Error ? error.message : "Unable to load notifications");
+    } finally {
+      setIsNotificationsLoading(false);
+      setIsNotificationsPaging(false);
+    }
+  }
+
+  function handleNotificationsScroll(event: UIEvent<HTMLElement>) {
+    const target = event.currentTarget;
+    const pagination = notificationsData?.pagination;
+
+    if (!pagination || isNotificationsLoading || isNotificationsPaging || pagination.page >= pagination.totalPages) {
+      return;
+    }
+
+    if (target.scrollHeight - target.scrollTop - target.clientHeight <= 80) {
+      loadAdminNotifications(pagination.page + 1, notificationsSearch, true);
+    }
+  }
+
+  function openNotificationsDrawer() {
+    setIsNotificationsDrawerOpen(true);
+    loadAdminNotifications(1);
+  }
+
+  async function markAdminNotificationRead(publicId?: string) {
+    if (!adminUser?.token || !publicId) {
+      return;
+    }
+
+    try {
+      setNotificationsError("");
+      setIsNotificationMarking(true);
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/${publicId}/read`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to mark notification as read");
+      }
+
+      await loadAdminNotifications(1);
+    } catch (error) {
+      setNotificationsError(error instanceof Error ? error.message : "Unable to mark notification as read");
+    } finally {
+      setIsNotificationMarking(false);
+    }
+  }
+
+  async function markAllAdminNotificationsRead() {
+    if (!adminUser?.token || !adminUser.isAdmin) {
+      return;
+    }
+
+    try {
+      setNotificationsError("");
+      setIsNotificationMarking(true);
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/read-all`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to mark notifications as read");
+      }
+
+      await loadAdminNotifications(1);
+    } catch (error) {
+      setNotificationsError(error instanceof Error ? error.message : "Unable to mark notifications as read");
+    } finally {
+      setIsNotificationMarking(false);
     }
   }
 
@@ -4292,7 +4473,7 @@ export default function Home() {
 
       setIsGeneralMenuOpen(["General", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].includes(routeView));
       setIsUserManagementMenuOpen(routeView === "Users");
-      setIsEmployeeManagementMenuOpen(routeView === "Employees" || routeView === "Roles");
+      setIsEmployeeManagementMenuOpen(routeView === "Employees" || routeView === "Roles" || routeView === "Login History");
       setIsSubscriptionsMenuOpen(routeView === "Basic Subscriptions" || routeView === "Repair Subscriptions");
       setIsPlansBenefitsMenuOpen(routeView === "Plans & Benefits" || routeView === "Basic Plan");
       setIsServicesMenuOpen(routeView === "Credit Repair" || routeView === "Disputes");
@@ -4344,11 +4525,22 @@ export default function Home() {
   }, [activeView, adminUser?.token, hasLoadedFaqs, isFaqsLoading]);
 
   useEffect(() => {
-    if (activeView === "Notifications" && adminUser?.token && !notificationUsersData && !isNotificationsLoading) {
-      loadNotificationUsers();
+    if (adminUser?.token) {
+      loadAdminNotifications(1);
+    }
+  }, [adminUser?.token]);
+
+  useEffect(() => {
+    if (activeView === "Notifications" && notificationsTab === "notifications" && adminUser?.token) {
       loadAdminNotifications();
     }
-  }, [activeView, adminUser?.token, notificationUsersData, isNotificationsLoading]);
+  }, [activeView, notificationsTab, adminUser?.token]);
+
+  useEffect(() => {
+    if (activeView === "Notifications" && notificationsTab === "users" && adminUser?.token && !notificationUsersData && !isNotificationsLoading) {
+      loadNotificationUsers();
+    }
+  }, [activeView, notificationsTab, adminUser?.token, notificationUsersData, isNotificationsLoading]);
 
   useEffect(() => {
     if (activeView === "Plans & Benefits" && adminUser?.token && !hasLoadedAdminPlans && !isAdminPlansLoading) {
@@ -4421,6 +4613,12 @@ export default function Home() {
       loadEmployeeMenuAccess();
     }
   }, [activeView, adminUser?.token, employeeRolesData, isEmployeeRolesLoading]);
+
+  useEffect(() => {
+    if (activeView === "Login History" && adminUser?.token && !loginEventsData && !isLoginEventsLoading) {
+      loadLoginEvents();
+    }
+  }, [activeView, adminUser?.token, loginEventsData, isLoginEventsLoading]);
 
   useEffect(() => {
     if (activeView === "Feedback" && adminUser?.token && !feedbackData && !isFeedbackLoading) {
@@ -4618,6 +4816,9 @@ export default function Home() {
 
   function goBackToMobile() {
     setOtp("");
+    setAuthenticatorCode("");
+    setMfaToken("");
+    setAuthenticatorSetup(null);
     setError("");
     setStep("mobile");
     router.push("/login");
@@ -4648,6 +4849,45 @@ export default function Home() {
     otpInputRefs.current[Math.min(pastedOtp.length, 5)]?.focus();
   }
 
+  async function completeAdminLogin(authData: any) {
+    const user = authData.employee;
+
+    if (!user) {
+      setError("You do not have admin access");
+      return;
+    }
+
+    const sessionUser = {
+      token: authData.token,
+      tokenType: authData.tokenType,
+      fullName: user.fullName,
+      email: user.email,
+      mobileNumber: user.mobileNumber,
+      isAdmin: Boolean(user.isAdmin || user.role?.toLowerCase() === "admin"),
+      loginEventId: authData.loginEventId,
+    };
+
+    sessionStorage.setItem("scorecare_admin", JSON.stringify(sessionUser));
+    localStorage.setItem("scorecare_admin", JSON.stringify(sessionUser));
+    sessionStorage.removeItem("scorecare_otp_mobile");
+    setAdminUser(sessionUser);
+    const permissions = await loadUserPermissions(authData.token);
+    const isDashboardReady = permissions ? await loadDashboardCounts(authData.token) : false;
+
+    if (isDashboardReady && permissions) {
+      const routeView = getFirstAllowedView(permissions);
+
+      if (!routeView) {
+        setError("You do not have admin access");
+        return;
+      }
+
+      setActiveView(routeView);
+      setStep("admin");
+      router.push(viewRoutes[routeView]);
+    }
+  }
+
   async function submitOtp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -4662,45 +4902,51 @@ export default function Home() {
       });
       const result = await response.json();
 
-      if (!response.ok || result.status !== "success") {
+      if (!response.ok || (result.status && result.status !== "success")) {
         throw new Error(result.message || "Invalid OTP");
       }
 
-      if (!result.data?.employee) {
-        setError("You do not have admin access");
+      const authData = result.data || result;
+
+      if (authData.requiresAuthenticator) {
+        setMfaToken(authData.mfaToken);
+        setAuthenticatorSetup(authData.authenticatorSetupRequired ? authData.authenticatorSetup : null);
+        setAuthenticatorCode("");
+        setStep("authenticator");
         return;
       }
 
-      const user = result.data.employee;
-      const sessionUser = {
-        token: result.data.token,
-        tokenType: result.data.tokenType,
-        fullName: user.fullName,
-        email: user.email,
-        mobileNumber: user.mobileNumber,
-      };
-
-      sessionStorage.setItem("scorecare_admin", JSON.stringify(sessionUser));
-      localStorage.setItem("scorecare_admin", JSON.stringify(sessionUser));
-      sessionStorage.removeItem("scorecare_otp_mobile");
-      setAdminUser(sessionUser);
-      const permissions = await loadUserPermissions(result.data.token);
-      const isDashboardReady = permissions ? await loadDashboardCounts(result.data.token) : false;
-
-      if (isDashboardReady && permissions) {
-        const routeView = getFirstAllowedView(permissions);
-
-        if (!routeView) {
-          setError("You do not have admin access");
-          return;
-        }
-
-        setActiveView(routeView);
-        setStep("admin");
-        router.push(viewRoutes[routeView]);
-      }
+      await completeAdminLogin(authData);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Invalid OTP");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function submitAuthenticator(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/admin/verify-authenticator`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${mfaToken}`,
+        },
+        body: JSON.stringify({ code: authenticatorCode }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || (result.status && result.status !== "success")) {
+        throw new Error(result.message || "Invalid authenticator code");
+      }
+
+      await completeAdminLogin(result.data || result);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Invalid authenticator code");
     } finally {
       setIsLoading(false);
     }
@@ -4715,7 +4961,18 @@ export default function Home() {
     return `${firstLetter}${lastLetter}`.toUpperCase();
   }
 
-  function logoutAdmin() {
+  async function logoutAdmin() {
+    if (adminUser?.token) {
+      try {
+        await fetch(`${API_BASE_URL}/auth/admin/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${adminUser.token}` },
+        });
+      } catch {
+        // continue local logout
+      }
+    }
+
     sessionStorage.removeItem("scorecare_admin");
     localStorage.removeItem("scorecare_admin");
     setAdminUser(null);
@@ -4973,6 +5230,16 @@ export default function Home() {
         ]
         : []),
     ]);
+    const loginEventColumns = ["Employee", "Email", "Mobile", "Role", "IP Address", "Login At", "Logout At"];
+    const loginEventRows = loginEventsData?.loginEvents.map((event) => [
+      event.employeeName || event.fullName || event.employeeCode || "-",
+      event.email || "-",
+      event.mobileNumber || "-",
+      event.role || "-",
+      event.ipAddress || "-",
+      formatDate(event.loginAt || event.loggedInAt || event.createdAt || null),
+      formatDate(event.logoutAt || event.loggedOutAt || null),
+    ]) ?? [];
     const subscriptionColumns = ["Name", "Mobile", "Email", "Plan", "Started At", "Due At", "Updated By", "Status", ...(canUpdateSubscriptions ? ["Action"] : [])];
     const subscriptionRows = usersData?.users.map((user) => [
       user.fullName,
@@ -5027,13 +5294,23 @@ export default function Home() {
         ]
         : []),
     ]) ?? [];
-    const notificationColumns = ["Title", "Message", "User", "Screen", "Created At"];
+    const notificationColumns = ["Type", "Title", "Message", "Status", "Created At", "Action"];
     const notificationRows = notificationsData?.notifications.map((notification) => [
+      notification.type || "-",
       notification.title || "-",
       notification.message || "-",
-      notification.scope || notification.user?.fullName || "-",
-      notification.screen || notification.data?.screen || "-",
+      notification.isRead || notification.readAt ? "Read" : "Unread",
       formatDate(notification.createdAt || null),
+      notification.isRead || notification.readAt ? "-" : (
+        <button
+          className="table-action"
+          disabled={isNotificationMarking}
+          type="button"
+          onClick={() => markAdminNotificationRead(notification.publicId)}
+        >
+          Mark read
+        </button>
+      ),
     ]) ?? [];
     const loanColumns = [
       "Name",
@@ -5285,8 +5562,8 @@ export default function Home() {
                         ) : null}
                       </div>
                     ) : null}
-                    {hasViewPermission("Employees") || hasViewPermission("Roles") ? (
-                      <div className={`sidebar-group ${activeView === "Employees" || activeView === "Roles" ? "active" : ""}`}>
+                    {hasViewPermission("Employees") || hasViewPermission("Roles") || hasViewPermission("Login History") ? (
+                      <div className={`sidebar-group ${activeView === "Employees" || activeView === "Roles" || activeView === "Login History" ? "active" : ""}`}>
                         <button className="sidebar-group-toggle" type="button" onClick={() => setIsEmployeeManagementMenuOpen((current) => !current)}>
                           <span className="menu-icon">{menuIcons.Users}</span>
                           Employee management
@@ -5296,6 +5573,7 @@ export default function Home() {
                           <div className="sidebar-submenu">
                             {hasViewPermission("Employees") ? <button className={activeView === "Employees" ? "active" : ""} type="button" onClick={() => openAdminView("Employees")}><span className="menu-icon">{menuIcons.Users}</span>Employees</button> : null}
                             {hasViewPermission("Roles") ? <button className={activeView === "Roles" ? "active" : ""} type="button" onClick={() => openAdminView("Roles")}><span className="menu-icon">{menuIcons.Users}</span>Roles</button> : null}
+                            {hasViewPermission("Login History") ? <button className={activeView === "Login History" ? "active" : ""} type="button" onClick={() => openAdminView("Login History")}><span className="menu-icon">{menuIcons.Users}</span>Login History</button> : null}
                           </div>
                         ) : null}
                       </div>
@@ -5409,7 +5687,10 @@ export default function Home() {
                   <strong>{currentTime ? currentTime.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }) : "--:--:--"}</strong>
                 </div>
               </div>
-              <span className="topbar-bell">{menuIcons.Notifications}</span>
+              <button className="topbar-bell" type="button" onClick={openNotificationsDrawer}>
+                {menuIcons.Notifications}
+                {notificationsData?.unreadCount ? <span className="topbar-bell-count">{notificationsData.unreadCount}</span> : null}
+              </button>
               <div className="profile-menu">
                 <button
                   className="profile-logo"
@@ -5644,7 +5925,10 @@ export default function Home() {
                   <button
                     className={notificationsTab === "notifications" ? "active" : ""}
                     type="button"
-                    onClick={() => setNotificationsTab("notifications")}
+                    onClick={() => {
+                      setNotificationsTab("notifications");
+                      loadAdminNotifications(1);
+                    }}
                   >
                     Notifications
                   </button>
@@ -5671,6 +5955,11 @@ export default function Home() {
                       <button type="button" onClick={() => loadAdminNotifications(1)}>
                         Search
                       </button>
+                      {adminUser?.isAdmin ? (
+                        <button disabled={isNotificationMarking} type="button" onClick={markAllAdminNotificationsRead}>
+                          Read all
+                        </button>
+                      ) : null}
                       {canCreateNotifications ? (
                         <button type="button" onClick={() => openNotificationModal("all")}>
                           Send All
@@ -5678,22 +5967,15 @@ export default function Home() {
                       ) : null}
                     </section>
 
-                    <CommonTable
-                      columns={notificationColumns}
-                      emptyText={isNotificationsLoading ? "Loading notifications..." : "No notifications found"}
-                      isLoading={isNotificationsLoading}
-                      pagination={
-                        notificationsData?.pagination
-                          ? {
-                            page: notificationsData.pagination.page,
-                            totalPages: notificationsData.pagination.totalPages,
-                            onPrevious: () => loadAdminNotifications(notificationsData.pagination.page - 1),
-                            onNext: () => loadAdminNotifications(notificationsData.pagination.page + 1),
-                          }
-                          : undefined
-                      }
-                      rows={notificationRows}
-                    />
+                    <div className="notifications-scroll" onScroll={handleNotificationsScroll}>
+                      <CommonTable
+                        columns={notificationColumns}
+                        emptyText={isNotificationsLoading ? "Loading notifications..." : "No notifications found"}
+                        isLoading={isNotificationsLoading}
+                        rows={notificationRows}
+                      />
+                      {isNotificationsPaging ? <p className="notifications-loading-more">Loading more...</p> : null}
+                    </div>
                   </>
                 ) : (
                   <>
@@ -6853,6 +7135,52 @@ export default function Home() {
                   </>
                 )}
               </>
+            ) : activeView === "Login History" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Login History</h2>
+                    <p>Track admin and employee login sessions</p>
+                  </div>
+                  <span>{loginEventsData?.pagination.total ?? 0} records</span>
+                </section>
+
+                <section className="table-toolbar notification-users-toolbar">
+                  <input
+                    placeholder="Search login history..."
+                    value={loginEventsSearch}
+                    onChange={(event) => setLoginEventsSearch(event.target.value)}
+                  />
+                  <button className="icon-button" title="Reset login history" type="button" onClick={() => {
+                    setLoginEventsSearch("");
+                    loadLoginEvents(1, "");
+                  }}>
+                    ↻
+                  </button>
+                  <button type="button" onClick={() => loadLoginEvents(1)}>
+                    Search
+                  </button>
+                </section>
+
+                {loginEventsError ? <p className="dashboard-error">{loginEventsError}</p> : null}
+
+                <CommonTable
+                  columns={loginEventColumns}
+                  emptyText={isLoginEventsLoading ? "Loading login history..." : "No login history found"}
+                  isLoading={isLoginEventsLoading}
+                  pagination={
+                    loginEventsData?.pagination
+                      ? {
+                        page: loginEventsData.pagination.page,
+                        totalPages: loginEventsData.pagination.totalPages,
+                        onPrevious: () => loadLoginEvents(loginEventsData.pagination.page - 1),
+                        onNext: () => loadLoginEvents(loginEventsData.pagination.page + 1),
+                      }
+                      : undefined
+                  }
+                  rows={loginEventRows}
+                />
+              </>
             ) : activeView === "Basic Subscriptions" ? (
               <>
                 <section className="welcome-panel">
@@ -7445,6 +7773,46 @@ export default function Home() {
             </section>
           </div>
         ) : null}
+        {isNotificationsDrawerOpen ? (
+          <div className="notifications-drawer-backdrop" onClick={() => setIsNotificationsDrawerOpen(false)}>
+            <aside className="notifications-drawer" onClick={(event) => event.stopPropagation()}>
+              <header>
+                <div>
+                  <h3>Notifications</h3>
+                  <p>{notificationsData?.unreadCount ?? 0} unread</p>
+                </div>
+                <button type="button" onClick={() => setIsNotificationsDrawerOpen(false)}>
+                  ×
+                </button>
+              </header>
+
+              <div className="notifications-drawer-list" onScroll={handleNotificationsScroll}>
+                {notificationsData?.notifications.length ? (
+                  notificationsData.notifications.map((notification) => (
+                    <button
+                      className={`notifications-drawer-item ${notification.isRead || notification.readAt ? "" : "unread"}`}
+                      key={notification.publicId || notification.id}
+                      type="button"
+                      onClick={() => markAdminNotificationRead(notification.publicId)}
+                    >
+                      <span>{notification.type || "notification"}</span>
+                      <strong>{notification.title || "-"}</strong>
+                      <p>{notification.message || "-"}</p>
+                      <small>{formatDate(notification.createdAt || null)}</small>
+                    </button>
+                  ))
+                ) : (
+                  <div className="notifications-drawer-empty">
+                    <span>{isNotificationsLoading ? "↻" : "🔔"}</span>
+                    <strong>{isNotificationsLoading ? "Loading notifications" : "You're all caught up"}</strong>
+                    <p>{isNotificationsLoading ? "Please wait while we fetch updates." : "No new notifications to show right now."}</p>
+                  </div>
+                )}
+                {isNotificationsPaging ? <p className="notifications-loading-more">Loading more...</p> : null}
+              </div>
+            </aside>
+          </div>
+        ) : null}
         {isNotificationModalOpen && canCreateNotifications ? (
           <div className="modal-backdrop">
             <section className="plan-modal admin-plan-modal notification-modal">
@@ -7926,7 +8294,7 @@ export default function Home() {
             {isLoading ? "Sending OTP..." : "Next"}
           </button>
         </form>
-      ) : (
+      ) : step === "otp" ? (
         <form className="auth-box" onSubmit={submitOtp}>
           <button className="auth-back" type="button" onClick={goBackToMobile} aria-label="Back to mobile number">
             ‹
@@ -7963,6 +8331,42 @@ export default function Home() {
           </button>
           <button className="auth-resend" disabled={isLoading || resendSeconds > 0} type="button" onClick={resendOtp}>
             Resend OTP {resendSeconds > 0 ? `00:${String(resendSeconds).padStart(2, "0")}` : ""}
+          </button>
+        </form>
+      ) : (
+        <form className="auth-box" onSubmit={submitAuthenticator}>
+          <button className="auth-back" type="button" onClick={goBackToMobile} aria-label="Back to mobile number">
+            ‹
+          </button>
+          <div className="auth-brand">
+            <span>↪</span>
+          </div>
+          <div className="auth-header">
+            <h1>Google Authenticator</h1>
+            <p>{authenticatorSetup ? "Scan this QR, then enter the 6 digit code" : "Enter the 6 digit code from your authenticator app"}</p>
+          </div>
+          {authenticatorSetup ? (
+            <div className="authenticator-setup">
+              <QRCodeSVG className="authenticator-qr" value={authenticatorSetup.otpauthUrl} size={180} />
+              <p className="authenticator-secret">{authenticatorSetup.secret}</p>
+            </div>
+          ) : null}
+          <label htmlFor="authenticator-code">Authenticator Code</label>
+          <div className="auth-field">
+            <input
+              id="authenticator-code"
+              required
+              inputMode="numeric"
+              maxLength={6}
+              minLength={6}
+              placeholder="123456"
+              value={authenticatorCode}
+              onChange={(event) => setAuthenticatorCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+          </div>
+          {error ? <p className="auth-error">{error}</p> : null}
+          <button disabled={isLoading || authenticatorCode.length !== 6} type="submit">
+            {isLoading ? "Verifying..." : "Verify"}
           </button>
         </form>
       )}
