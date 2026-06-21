@@ -1291,6 +1291,8 @@ export default function Home() {
   const [deletingEmployeeRole, setDeletingEmployeeRole] = useState<EmployeeRole | null>(null);
   const [loginEventsData, setLoginEventsData] = useState<EmployeeLoginEventsResponse | null>(null);
   const [loginEventsSearch, setLoginEventsSearch] = useState("");
+  const [loginEventsFromDate, setLoginEventsFromDate] = useState("");
+  const [loginEventsToDate, setLoginEventsToDate] = useState("");
   const [loginEventsError, setLoginEventsError] = useState("");
   const [isLoginEventsLoading, setIsLoginEventsLoading] = useState(false);
   const [employeeRoleForm, setEmployeeRoleForm] = useState<EmployeeRoleForm>({
@@ -2120,7 +2122,7 @@ export default function Home() {
     }
   }
 
-  async function loadLoginEvents(page = 1, search = loginEventsSearch) {
+  async function loadLoginEvents(page = 1, search = loginEventsSearch, from = loginEventsFromDate, to = loginEventsToDate) {
     if (!adminUser?.token) {
       return;
     }
@@ -2131,6 +2133,12 @@ export default function Home() {
       const params = new URLSearchParams({ page: String(page), limit: "10" });
       if (search.trim()) {
         params.set("search", search.trim());
+      }
+      if (from) {
+        params.set("from", from);
+      }
+      if (to) {
+        params.set("totime", to);
       }
       const response = await fetch(`${API_BASE_URL}/admin/login-events?${params.toString()}`, {
         headers: { Authorization: `Bearer ${adminUser.token}` },
@@ -4995,16 +5003,16 @@ export default function Home() {
     const disputesStatusGraph = dashboardCounts?.graphs.disputesByStatus ?? [];
     const totalRevenue = dashboardCounts?.revenue?.total ?? dashboardCounts?.amount ?? 0;
     const kpiCards = [
-      { label: "Total Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, icon: dashboardIcons.users, trend: "+12%" },
-      { label: "Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}`, meta: "Total collected", icon: dashboardIcons.revenue, trend: "+8%" },
-      { label: "Subscriptions", value: dashboardCounts?.subscriptions ?? 0, meta: `${dashboardCounts?.upcomingOverdues ?? 0} past due`, icon: dashboardIcons.subscriptions, trend: "+5%" },
-      { label: "Credit Reports", value: dashboardCounts?.totalCreditReports ?? 0, meta: `${dashboardCounts?.reportsWithScore ?? 0} with score`, icon: dashboardIcons.reports, trend: "0%" },
-      { label: "Messages", value: dashboardCounts?.totalMessages ?? 0, meta: "Total chats", icon: dashboardIcons.messages, trend: "+3%" },
-      { label: "Feedback", value: dashboardCounts?.totalFeedback ?? 0, meta: "User ratings", icon: dashboardIcons.feedback, trend: "+6%" },
-      { label: "Notifications", value: dashboardCounts?.totalNotifications ?? 0, meta: `${dashboardCounts?.unreadNotifications ?? 0} unread`, icon: dashboardIcons.notifications, trend: "0%" },
-      { label: "Employees", value: dashboardCounts?.employees?.total ?? 0, meta: `${dashboardCounts?.employees?.active ?? 0} active`, icon: dashboardIcons.employees, trend: "0%" },
-      { label: "Roles", value: dashboardCounts?.roles?.total ?? 0, meta: `${dashboardCounts?.roles?.active ?? 0} active`, icon: dashboardIcons.roles, trend: "0%" },
-      { label: "API History", value: dashboardCounts?.apiHistoryCount ?? 0, meta: "Credit bureau requests", icon: dashboardIcons.apiLogs, trend: "0%" },
+      { label: "Total Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, icon: dashboardIcons.users, trend: "+12%", view: "Users" as AppView },
+      { label: "Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}`, meta: "Total collected", icon: dashboardIcons.revenue, trend: "+8%", view: "Basic Subscription" as AppView },
+      { label: "Subscriptions", value: dashboardCounts?.subscriptions ?? 0, meta: `${dashboardCounts?.upcomingOverdues ?? 0} past due`, icon: dashboardIcons.subscriptions, trend: "+5%", view: "Basic Subscriptions" as AppView },
+      { label: "Credit Reports", value: dashboardCounts?.totalCreditReports ?? 0, meta: `${dashboardCounts?.reportsWithScore ?? 0} with score`, icon: dashboardIcons.reports, trend: "0%", view: "Report Downloads" as AppView },
+      { label: "Messages", value: dashboardCounts?.totalMessages ?? 0, meta: "Total chats", icon: dashboardIcons.messages, trend: "+3%", view: "Chats" as AppView },
+      { label: "Feedback", value: dashboardCounts?.totalFeedback ?? 0, meta: "User ratings", icon: dashboardIcons.feedback, trend: "+6%", view: "Feedback" as AppView },
+      { label: "Notifications", value: dashboardCounts?.totalNotifications ?? 0, meta: `${dashboardCounts?.unreadNotifications ?? 0} unread`, icon: dashboardIcons.notifications, trend: "0%", view: "Notifications" as AppView },
+      { label: "Employees", value: dashboardCounts?.employees?.total ?? 0, meta: `${dashboardCounts?.employees?.active ?? 0} active`, icon: dashboardIcons.employees, trend: "0%", view: "Employees" as AppView },
+      { label: "Roles", value: dashboardCounts?.roles?.total ?? 0, meta: `${dashboardCounts?.roles?.active ?? 0} active`, icon: dashboardIcons.roles, trend: "0%", view: "Roles" as AppView },
+      { label: "API History", value: dashboardCounts?.apiHistoryCount ?? 0, meta: "Credit bureau requests", icon: dashboardIcons.apiLogs, trend: "0%", view: "API Logs" as AppView },
     ];
     const pieColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444", "#7c3aed"];
     const subscriptionColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444"];
@@ -5241,8 +5249,8 @@ export default function Home() {
       event.mobileNumber || "-",
       event.role || "-",
       event.ipAddress || "-",
-      formatDate(event.loginAt || event.loggedInAt || event.createdAt || null),
-      formatDate(event.logoutAt || event.loggedOutAt || null),
+      formatDateTime(event.loginAt || event.loggedInAt || event.createdAt || null),
+      formatDateTime(event.logoutAt || event.loggedOutAt || null),
     ]) ?? [];
     const subscriptionColumns = ["Name", "Mobile", "Email", "Plan", "Started At", "Due At", "Updated By", "Status", ...(canUpdateSubscriptions ? ["Action"] : [])];
     const subscriptionRows = usersData?.users.map((user) => [
@@ -7157,15 +7165,19 @@ export default function Home() {
                   <span>{loginEventsData?.pagination.total ?? 0} records</span>
                 </section>
 
-                <section className="table-toolbar notification-users-toolbar">
+                <section className="table-toolbar login-history-toolbar">
                   <input
                     placeholder="Search login history..."
                     value={loginEventsSearch}
                     onChange={(event) => setLoginEventsSearch(event.target.value)}
                   />
+                  <DateFilter label="Login from" value={loginEventsFromDate} onChange={setLoginEventsFromDate} />
+                  <DateFilter label="Logout to" value={loginEventsToDate} onChange={setLoginEventsToDate} />
                   <button className="icon-button" title="Reset login history" type="button" onClick={() => {
                     setLoginEventsSearch("");
-                    loadLoginEvents(1, "");
+                    setLoginEventsFromDate("");
+                    setLoginEventsToDate("");
+                    loadLoginEvents(1, "", "", "");
                   }}>
                     ↻
                   </button>
@@ -7483,17 +7495,33 @@ export default function Home() {
                 {dashboardError ? <p className="dashboard-error">{dashboardError}</p> : null}
 
                 <section className="analytics-kpi-grid">
-                  {kpiCards.map((card) => (
-                    <article className="analytics-kpi-card" key={card.label}>
-                      <div className="analytics-kpi-icon">{card.icon}</div>
-                      <div>
-                        <span>{card.label}</span>
-                        <strong>{card.value}</strong>
-                        <small>{card.meta}</small>
-                      </div>
-                      <em>{card.trend}</em>
-                    </article>
-                  ))}
+                  {kpiCards.map((card) => {
+                    const canOpenCard = hasViewPermission(card.view);
+
+                    return (
+                      <article
+                        className={`analytics-kpi-card${canOpenCard ? " clickable" : ""}`}
+                        key={card.label}
+                        role={canOpenCard ? "button" : undefined}
+                        tabIndex={canOpenCard ? 0 : undefined}
+                        onClick={() => canOpenCard && openAdminView(card.view)}
+                        onKeyDown={(event) => {
+                          if (canOpenCard && (event.key === "Enter" || event.key === " ")) {
+                            event.preventDefault();
+                            openAdminView(card.view);
+                          }
+                        }}
+                      >
+                        <div className="analytics-kpi-icon">{card.icon}</div>
+                        <div>
+                          <span>{card.label}</span>
+                          <strong>{card.value}</strong>
+                          <small>{card.meta}</small>
+                        </div>
+                        <em>{card.trend}</em>
+                      </article>
+                    );
+                  })}
                 </section>
 
                 <section className="analytics-chart-grid">
@@ -8276,7 +8304,7 @@ export default function Home() {
       {step === "mobile" ? (
         <form className="auth-box" onSubmit={submitMobile}>
           <div className="auth-brand">
-            <span>↪</span>
+            <img src="/scorecare-logo.PNG" alt="ScoreCare" />
           </div>
           <div className="auth-header">
             <h1>Admin Login</h1>
@@ -8312,7 +8340,7 @@ export default function Home() {
             ‹
           </button>
           <div className="auth-brand">
-            <span>↪</span>
+            <img src="/scorecare-logo.PNG" alt="ScoreCare" />
           </div>
           <div className="auth-header">
             <h1>Enter OTP</h1>
@@ -8351,7 +8379,7 @@ export default function Home() {
             ‹
           </button>
           <div className="auth-brand">
-            <span>↪</span>
+            <img src="/scorecare-logo.PNG" alt="ScoreCare" />
           </div>
           <div className="auth-header">
             <h1>Google Authenticator</h1>
@@ -8462,6 +8490,20 @@ function formatDate(value: string | null) {
   }
 
   return new Date(value).toLocaleDateString("en-IN");
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function getLoanTypeLabel(value: string) {

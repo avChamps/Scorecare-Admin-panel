@@ -119,10 +119,10 @@ select {
 
 .auth-brand {
   align-items: center;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(203, 213, 225, 0.8);
+  /* background: rgba(255, 255, 255, 0.82); */
+  /* border: 1px solid rgba(203, 213, 225, 0.8); */
   border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  /* box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12); */
   color: #1f2937;
   display: flex;
   font-size: 30px;
@@ -132,6 +132,14 @@ select {
   justify-self: center;
   margin-bottom: clamp(4px, 1.6vh, 14px);
   width: 64px;
+}
+
+.auth-brand img {
+  display: block;
+  height: auto;
+  max-height: 140px;
+  max-width: 140px;
+  object-fit: contain;
 }
 
 .auth-header {
@@ -156,7 +164,7 @@ select {
 }
 
 .auth-box label {
-  color: #475569;
+  /* color: #475569; */
   font-size: 13px;
   font-weight: 800;
 }
@@ -744,6 +752,15 @@ select {
   padding: 18px;
 }
 
+.analytics-kpi-card.clickable {
+  cursor: pointer;
+}
+
+.analytics-kpi-card.clickable:focus-visible {
+  outline: 3px solid rgba(23, 105, 224, 0.25);
+  outline-offset: 3px;
+}
+
 .analytics-kpi-icon {
   align-items: center;
   background: #eef5ff;
@@ -1226,6 +1243,13 @@ select {
   position: relative;
 }
 
+.date-filter-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-plan-form .date-filter {
   width: 100%;
 }
@@ -1465,6 +1489,10 @@ select {
 
 .notification-users-toolbar {
   grid-template-columns: minmax(220px, 1fr) 44px 170px auto;
+}
+
+.login-history-toolbar {
+  grid-template-columns: minmax(260px, 1fr) 170px 170px 44px minmax(120px, auto);
 }
 
 .notifications-scroll {
@@ -3270,7 +3298,7 @@ select {
 
 .topbar .profile-logo {
   align-items: center;
-  background: linear-gradient(135deg, #1769e0, #18a999);
+  background: #1AA586;
   border: 0;
   border-radius: 999px;
   box-shadow: 0 10px 22px rgba(23, 105, 224, 0.24);
