@@ -483,7 +483,7 @@ select {
   height: 100dvh;
   min-height: 0;
   min-width: 0;
-  overflow: auto;
+  overflow-y: auto;
 }
 
 .api-loader {
@@ -1170,12 +1170,21 @@ select {
   border-radius: 12px;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.07);
   display: block;
-  justify-self: start;
-  min-width: 100%;
-  overflow: visible;
+  max-width: 100%;
+  overflow-x: auto;
   overflow-y: visible;
   padding: 10px;
-  width: max-content;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.common-table::-webkit-scrollbar {
+  height: 8px;
+}
+
+.common-table::-webkit-scrollbar-thumb {
+  background: #c7cdea;
+  border-radius: 999px;
 }
 
 .common-table table {
@@ -3734,8 +3743,9 @@ select {
 
   .common-table {
     display: block;
-    max-width: none;
-    overflow: visible;
+    max-width: calc(100vw - 32px);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .common-table table {
@@ -3939,7 +3949,7 @@ select {
   }
 
   .common-table {
-    max-width: none;
+    max-width: calc(100vw - 24px);
     padding: 6px;
   }
 
