@@ -947,6 +947,15 @@ type CreditRepairRequest = {
     accountNumber: string;
     subscriberName: string;
   }>;
+  documents?: Array<{
+    id: number | string;
+    documentType?: string | null;
+    documentUrl?: string | null;
+    accountNumber?: string | null;
+    accountType?: string | null;
+    closingDate?: string | null;
+    createdAt?: string | null;
+  }>;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -1405,6 +1414,7 @@ export default function Home() {
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [notificationModalScope, setNotificationModalScope] = useState<"all" | "users">("all");
   const [notificationsData, setNotificationsData] = useState<AdminNotificationsResponse | null>(null);
+  const [appNotificationsData, setAppNotificationsData] = useState<AdminNotificationsResponse | null>(null);
   const [notificationsError, setNotificationsError] = useState("");
   const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
   const [isNotificationsPaging, setIsNotificationsPaging] = useState(false);
@@ -1475,7 +1485,7 @@ export default function Home() {
 
     if (view === "Notifications") {
       setNotificationsTab("notifications");
-      loadAdminNotifications(1);
+      loadAppNotifications(1);
     }
 
     if (view === "Plans & Benefits") {
@@ -2700,6 +2710,64 @@ export default function Home() {
     }
   }
 
+  async function loadAppNotifications(page = 1, search = notificationsSearch, append = false) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setNotificationsError("");
+      if (append) {
+        setIsNotificationsPaging(true);
+      } else {
+        setIsNotificationsLoading(true);
+      }
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "10",
+      });
+      if (search.trim()) {
+        params.set("search", search.trim());
+      }
+      const response = await fetch(`${API_BASE_URL}/admin/app-notifications?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load notifications");
+      }
+
+      setAppNotificationsData((current) => {
+        if (!append || !current) {
+          return result.data;
+        }
+
+        const existingIds = new Set(current.notifications.map((notification) => notification.publicId || notification.id));
+        const nextNotifications = result.data.notifications.filter(
+          (notification: AdminNotificationRow) => !existingIds.has(notification.publicId || notification.id)
+        );
+
+        return {
+          ...result.data,
+          notifications: [...current.notifications, ...nextNotifications],
+        };
+      });
+    } catch (error) {
+      setNotificationsError(error instanceof Error ? error.message : "Unable to load notifications");
+    } finally {
+      setIsNotificationsLoading(false);
+      setIsNotificationsPaging(false);
+    }
+  }
+
   function handleNotificationsScroll(event: UIEvent<HTMLElement>) {
     const target = event.currentTarget;
     const pagination = notificationsData?.pagination;
@@ -2710,6 +2778,19 @@ export default function Home() {
 
     if (target.scrollHeight - target.scrollTop - target.clientHeight <= 80) {
       loadAdminNotifications(pagination.page + 1, notificationsSearch, true);
+    }
+  }
+
+  function handleAppNotificationsScroll(event: UIEvent<HTMLElement>) {
+    const target = event.currentTarget;
+    const pagination = appNotificationsData?.pagination;
+
+    if (!pagination || isNotificationsLoading || isNotificationsPaging || pagination.page >= pagination.totalPages) {
+      return;
+    }
+
+    if (target.scrollHeight - target.scrollTop - target.clientHeight <= 80) {
+      loadAppNotifications(pagination.page + 1, notificationsSearch, true);
     }
   }
 
@@ -2815,7 +2896,7 @@ export default function Home() {
       showToast("success", "Notification sent successfully");
       setSelectedNotificationUserIds([]);
       closeNotificationModal();
-      await loadAdminNotifications();
+      await loadAppNotifications();
     } catch (error) {
       setNotificationsError(error instanceof Error ? error.message : "Unable to send notification");
     } finally {
@@ -3858,7 +3939,7 @@ export default function Home() {
     try {
       setCreditRepairError("");
       setIsCreditRepairLoading(true);
-      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests?page=${page}&limit=20`, {
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests?page=${page}&limit=10`, {
         headers: { Authorization: `Bearer ${adminUser.token}` },
       });
       const result = await response.json();
@@ -4296,7 +4377,7 @@ export default function Home() {
 
   function resetNotificationsList() {
     setNotificationsSearch("");
-    loadAdminNotifications(1, "");
+    loadAppNotifications(1, "");
   }
 
   function openNotificationModal(scope: "all" | "users", userPublicId?: string) {
@@ -4544,7 +4625,7 @@ export default function Home() {
 
   useEffect(() => {
     if (activeView === "Notifications" && notificationsTab === "notifications" && adminUser?.token) {
-      loadAdminNotifications();
+      loadAppNotifications();
     }
   }, [activeView, notificationsTab, adminUser?.token]);
 
@@ -5307,7 +5388,7 @@ export default function Home() {
         : []),
     ]) ?? [];
     const notificationColumns = ["Type", "Title", "Message", "Status", "Created At", "Action"];
-    const notificationRows = notificationsData?.notifications.map((notification) => [
+    const notificationRows = appNotificationsData?.notifications.map((notification) => [
       notification.type || "-",
       notification.title || "-",
       notification.message || "-",
@@ -5380,13 +5461,14 @@ export default function Home() {
       "Amount",
       "Payment Status",
       "Repair Status",
-      "Active Disputes",
-      "Resolved Disputes",
-      "Points Gained",
       "Accounts",
+      "Documents",
       "Remarks",
       "Created At",
       "Updated At",
+      "Active Disputes",
+      "Resolved Disputes",
+      "Points Gained",
       ...(canUpdateCreditRepair ? ["Action"] : []),
     ];
     const creditRepairRows = creditRepairData?.requests.map((request) => [
@@ -5397,9 +5479,6 @@ export default function Home() {
       `${request.currency || "INR"} ${Number(request.amount || 0).toLocaleString("en-IN")}`,
       formatLabel(request.paymentStatus),
       formatLabel(request.repairStatus),
-      request.activeDisputes ?? 0,
-      request.resolvedDisputes ?? 0,
-      request.pointsGained ?? 0,
       request.accounts?.length ? (
         <div className="credit-repair-accounts">
           {request.accounts.map((account, index) => (
@@ -5410,9 +5489,29 @@ export default function Home() {
           ))}
         </div>
       ) : "-",
+      request.documents?.length ? (
+        <div className="dispute-documents">
+          {request.documents.map((document, index) => (
+            document.documentUrl ? (
+              <a
+                className="table-action"
+                href={document.documentUrl}
+                key={document.id || `${document.documentUrl}-${index}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {formatLabel(document.documentType || `Document ${index + 1}`)}
+              </a>
+            ) : null
+          ))}
+        </div>
+      ) : "-",
       request.remarks || "-",
       formatDate(request.createdAt || null),
       formatDate(request.updatedAt || null),
+      request.activeDisputes ?? 0,
+      request.resolvedDisputes ?? 0,
+      request.pointsGained ?? 0,
       ...(canUpdateCreditRepair ? [
         <button className="table-action" type="button" onClick={() => openCreditRepairUpdate(request)}>
           <ActionIcon type="edit" />Update
@@ -5947,7 +6046,7 @@ export default function Home() {
                     type="button"
                     onClick={() => {
                       setNotificationsTab("notifications");
-                      loadAdminNotifications(1);
+                      loadAppNotifications(1);
                     }}
                   >
                     Notifications
@@ -5972,7 +6071,7 @@ export default function Home() {
                       <button className="icon-button" title="Reset notifications" type="button" onClick={resetNotificationsList}>
                         ↻
                       </button>
-                      <button type="button" onClick={() => loadAdminNotifications(1)}>
+                      <button type="button" onClick={() => loadAppNotifications(1)}>
                         Search
                       </button>
                       {adminUser?.isAdmin ? (
@@ -5987,7 +6086,7 @@ export default function Home() {
                       ) : null}
                     </section>
 
-                    <div className="notifications-scroll" onScroll={handleNotificationsScroll}>
+                    <div className="notifications-scroll" onScroll={handleAppNotificationsScroll}>
                       <CommonTable
                         columns={notificationColumns}
                         emptyText={isNotificationsLoading ? "Loading notifications..." : "No notifications found"}
@@ -7743,8 +7842,8 @@ export default function Home() {
                     Cancel
                   </button>
                   {(homepageThemeForm.originalImageName ? canUpdateHomepageThemes : canCreateHomepageThemes) ? (
-                    <button disabled={savingHomepageTheme === homepageThemeForm.imageName} type="submit">
-                      {savingHomepageTheme === homepageThemeForm.imageName ? (
+                    <button disabled={Boolean(savingHomepageTheme) && savingHomepageTheme === homepageThemeForm.imageName} type="submit">
+                      {Boolean(savingHomepageTheme) && savingHomepageTheme === homepageThemeForm.imageName ? (
                         "Saving..."
                       ) : (
                         <>
