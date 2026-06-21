@@ -1707,6 +1707,17 @@ select {
   gap: 24px;
 }
 
+.credit-repair-accounts {
+  display: grid;
+  gap: 8px;
+  min-width: 280px;
+}
+
+.credit-repair-accounts span {
+  display: grid;
+  gap: 2px;
+}
+
 .admin-plan-form .comparison-benefit-options .faq-checkbox {
   display: flex;
   padding-bottom: 10px;

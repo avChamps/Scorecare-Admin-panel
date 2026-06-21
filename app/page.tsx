@@ -867,31 +867,63 @@ type LoansResponse = {
   };
 };
 
-type ServiceRequestUser = {
-  fullName?: string;
-  mobileNumber?: string;
-  email?: string;
-  panNumber?: string;
-};
-
 type CreditRepairRequest = {
+  id: string;
   publicId: string;
-  user?: ServiceRequestUser | null;
-  clientId?: string | null;
+  userId: string;
+  userPublicId: string;
+  userName: string;
+  email: string;
+  mobileNumber: string;
+  planId: string;
+  planPublicId: string;
+  planName: string;
+  amount: number;
+  currency: string;
+  paymentStatus: string;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
   repairStatus: string;
+  activeDisputes: number;
+  resolvedDisputes: number;
+  pointsGained: number;
+  progressItems: unknown[];
   remarks?: string | null;
+  accounts: Array<{
+    issueType: string;
+    accountType: string;
+    accountNumber: string;
+    subscriberName: string;
+  }>;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
 
 type DisputeRequest = {
+  id: string;
   publicId: string;
-  user?: ServiceRequestUser | null;
-  clientId?: string | null;
-  bureauType?: string | null;
-  disputeType?: string | null;
+  userId: string;
+  userPublicId: string;
+  userName: string;
+  email: string;
+  mobileNumber: string;
+  accountData: {
+    lenderName: string;
+    accountType: string;
+    accountNumber: string;
+  };
+  lenderName: string;
+  accountNumber: string;
+  errorType: string;
+  bureaus: string[];
+  additionalDetails?: string | null;
+  documents?: Record<string, string> | null;
   status: string;
+  progressStep: number;
+  pointsGained: number;
   remarks?: string | null;
+  submittedAt?: string | null;
+  resolvedAt?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -4870,30 +4902,97 @@ export default function Home() {
         ]
         : []),
     ]) ?? [];
-    const creditRepairColumns = ["User", "Mobile", "Client ID", "Status", "Remarks", "Created At", ...(canUpdateCreditRepair ? ["Action"] : [])];
+    const creditRepairColumns = [
+      "User",
+      "Mobile",
+      "Email",
+      "Plan",
+      "Amount",
+      "Payment Status",
+      "Repair Status",
+      "Active Disputes",
+      "Resolved Disputes",
+      "Points Gained",
+      "Accounts",
+      "Remarks",
+      "Created At",
+      "Updated At",
+      ...(canUpdateCreditRepair ? ["Action"] : []),
+    ];
     const creditRepairRows = creditRepairData?.requests.map((request) => [
-      request.user?.fullName || "-",
-      request.user?.mobileNumber || "-",
-      request.clientId || "-",
+      request.userName || "-",
+      request.mobileNumber || "-",
+      request.email || "-",
+      request.planName || "-",
+      `${request.currency || "INR"} ${Number(request.amount || 0).toLocaleString("en-IN")}`,
+      formatLabel(request.paymentStatus),
       formatLabel(request.repairStatus),
+      request.activeDisputes ?? 0,
+      request.resolvedDisputes ?? 0,
+      request.pointsGained ?? 0,
+      request.accounts?.length ? (
+        <div className="credit-repair-accounts">
+          {request.accounts.map((account, index) => (
+            <span key={`${account.accountNumber}-${index}`}>
+              <strong>{account.subscriberName}</strong>
+              {account.accountType} · {account.accountNumber} · {account.issueType}
+            </span>
+          ))}
+        </div>
+      ) : "-",
       request.remarks || "-",
       formatDate(request.createdAt || null),
+      formatDate(request.updatedAt || null),
       ...(canUpdateCreditRepair ? [
         <button className="table-action" type="button" onClick={() => openCreditRepairUpdate(request)}>
           <ActionIcon type="edit" />Update
         </button>,
       ] : []),
     ]) ?? [];
-    const disputeColumns = ["User", "Mobile", "Client ID", "Bureau", "Dispute Type", "Status", "Remarks", "Created At", ...(canUpdateDisputes ? ["Action"] : [])];
+    const disputeColumns = [
+      "User",
+      "Mobile",
+      "Email",
+      "Lender",
+      "Account Type",
+      "Account Number",
+      "Error Type",
+      "Bureaus",
+      "Additional Details",
+      "Documents",
+      "Status",
+      "Progress Step",
+      "Points Gained",
+      "Remarks",
+      "Submitted At",
+      "Resolved At",
+      "Updated At",
+      ...(canUpdateDisputes ? ["Action"] : []),
+    ];
     const disputeRows = disputesData?.disputes.map((dispute) => [
-      dispute.user?.fullName || "-",
-      dispute.user?.mobileNumber || "-",
-      dispute.clientId || "-",
-      dispute.bureauType || "-",
-      dispute.disputeType || "-",
+      dispute.userName || "-",
+      dispute.mobileNumber || "-",
+      dispute.email || "-",
+      dispute.lenderName || dispute.accountData?.lenderName || "-",
+      dispute.accountData?.accountType || "-",
+      dispute.accountNumber || dispute.accountData?.accountNumber || "-",
+      dispute.errorType || "-",
+      dispute.bureaus?.join(", ") || "-",
+      dispute.additionalDetails || "-",
+      dispute.documents && Object.keys(dispute.documents).length ? (
+        <div className="table-actions">
+          {Object.entries(dispute.documents).map(([name, url]) => (
+            <a className="table-action" href={url} key={name} rel="noreferrer" target="_blank">{formatLabel(name)}</a>
+          ))}
+        </div>
+      ) : "-",
       formatLabel(dispute.status),
+      dispute.progressStep ?? 0,
+      dispute.pointsGained ?? 0,
       dispute.remarks || "-",
-      formatDate(dispute.createdAt || null),
+      formatDate(dispute.submittedAt || dispute.createdAt || null),
+      formatDate(dispute.resolvedAt || null),
+      formatDate(dispute.updatedAt || null),
       ...(canUpdateDisputes ? [
         <button className="table-action" type="button" onClick={() => openDisputeUpdate(dispute)}>
           <ActionIcon type="edit" />Update
@@ -7410,7 +7509,7 @@ export default function Home() {
           <div className="modal-backdrop">
             <section className="plan-modal">
               <header>
-                <div><h3>Update Credit Repair</h3><p>{selectedCreditRepair.user?.fullName || selectedCreditRepair.clientId || "Request"}</p></div>
+                <div><h3>Update Credit Repair</h3><p>{selectedCreditRepair.userName || "Request"}</p></div>
                 <button type="button" onClick={() => setSelectedCreditRepair(null)}>×</button>
               </header>
               <label className="amount-field">
@@ -7434,7 +7533,7 @@ export default function Home() {
           <div className="modal-backdrop">
             <section className="plan-modal">
               <header>
-                <div><h3>Update Dispute</h3><p>{selectedDispute.user?.fullName || selectedDispute.clientId || "Dispute"}</p></div>
+                <div><h3>Update Dispute</h3><p>{selectedDispute.userName || "Dispute"}</p></div>
                 <button type="button" onClick={() => setSelectedDispute(null)}>×</button>
               </header>
               <label className="amount-field">
