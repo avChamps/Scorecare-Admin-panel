@@ -1727,6 +1727,13 @@ select {
   box-shadow: 0 0 0 4px rgba(105, 117, 223, 0.12);
 }
 
+.settings-file-name {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .legal-editor-panel {
   display: grid;
   gap: 16px;

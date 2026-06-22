@@ -262,7 +262,7 @@ type AdminUser = {
   loginEventId?: string;
 };
 
-type AppView = "Dashboard" | "General" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Basic Subscriptions" | "Repair Subscriptions" | "Users" | "Employees" | "Roles" | "Login History" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
+type AppView = "Dashboard" | "General" | "Website Settings" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Basic Subscriptions" | "Repair Subscriptions" | "Users" | "Employees" | "Roles" | "Login History" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
 
 type ManualReportType = "experian" | "cibil" | "crif";
 
@@ -275,6 +275,7 @@ type UserMenuAccess = {
 const viewRoutes: Record<AppView, string> = {
   Dashboard: "/dashboard",
   General: "/general",
+  "Website Settings": "/website-settings",
   "Homepage Themes": "/homepage-themes",
   "Legal Center": "/legal-center",
   Notifications: "/notifications",
@@ -305,6 +306,7 @@ const routeViews: Record<string, AppView> = {
   "/": "Dashboard",
   "/dashboard": "Dashboard",
   "/general": "General",
+  "/website-settings": "Website Settings",
   "/homepage-themes": "Homepage Themes",
   "/legal-center": "Legal Center",
   "/notifications": "Notifications",
@@ -334,6 +336,7 @@ const routeViews: Record<string, AppView> = {
 const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string | null }> = {
   Dashboard: { menuName: "Dashboard", childMenuName: null },
   General: { menuName: "General", childMenuName: "Site Settings" },
+  "Website Settings": { menuName: "General", childMenuName: "Website Settings" },
   "Homepage Themes": { menuName: "General", childMenuName: "Homepage Themes" },
   "Legal Center": { menuName: "General", childMenuName: "Legal Center" },
   Notifications: { menuName: "General", childMenuName: "Notifications" },
@@ -1161,6 +1164,21 @@ type GeneralSettings = {
   prompt_message: string;
 };
 
+type WebsiteSettingsFiles = {
+  privacyPolicy: File | null;
+  termsOfService: File | null;
+  disclaimer: File | null;
+  accountDeletion: File | null;
+};
+
+type WebsiteSettingsResponse = {
+  privacyPolicy: string;
+  termsOfService: string;
+  disclaimer: string;
+  accountDeletion: string;
+  updatedAt: string;
+};
+
 type HomepageTheme = {
   id?: number;
   imageName: string;
@@ -1377,6 +1395,17 @@ export default function Home() {
   const [isGeneralLoading, setIsGeneralLoading] = useState(false);
   const [isGeneralSaving, setIsGeneralSaving] = useState(false);
   const [hasLoadedGeneral, setHasLoadedGeneral] = useState(false);
+  const [websiteSettingsFiles, setWebsiteSettingsFiles] = useState<WebsiteSettingsFiles>({
+    privacyPolicy: null,
+    termsOfService: null,
+    disclaimer: null,
+    accountDeletion: null,
+  });
+  const [websiteSettingsData, setWebsiteSettingsData] = useState<WebsiteSettingsResponse | null>(null);
+  const [websiteSettingsError, setWebsiteSettingsError] = useState("");
+  const [isWebsiteSettingsLoading, setIsWebsiteSettingsLoading] = useState(false);
+  const [isWebsiteSettingsSaving, setIsWebsiteSettingsSaving] = useState(false);
+  const [hasLoadedWebsiteSettings, setHasLoadedWebsiteSettings] = useState(false);
   const [homepageThemes, setHomepageThemes] = useState<HomepageTheme[]>([]);
   const [homepageThemeForm, setHomepageThemeForm] = useState<HomepageThemeForm>({
     imageName: "",
@@ -2950,6 +2979,107 @@ export default function Home() {
       setGeneralError(error instanceof Error ? error.message : "Unable to update general settings");
     } finally {
       setIsGeneralSaving(false);
+    }
+  }
+
+  async function loadWebsiteSettings() {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setWebsiteSettingsError("");
+      setIsWebsiteSettingsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/admin/website-settings`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load website settings");
+      }
+
+      setWebsiteSettingsData(result.data || null);
+      setHasLoadedWebsiteSettings(true);
+    } catch (error) {
+      setWebsiteSettingsError(error instanceof Error ? error.message : "Unable to load website settings");
+    } finally {
+      setIsWebsiteSettingsLoading(false);
+    }
+  }
+
+  function getWebsiteSettingsFileName(filePath?: string) {
+    if (!filePath) {
+      return "";
+    }
+
+    return decodeURIComponent(filePath.split("/").pop() || filePath);
+  }
+
+  async function updateWebsiteSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token) {
+      return;
+    }
+
+    const form = event.currentTarget;
+    const formData = new FormData();
+    let hasFile = false;
+    Object.entries(websiteSettingsFiles).forEach(([key, file]) => {
+      if (file) {
+        formData.append(key, file);
+        hasFile = true;
+      }
+    });
+
+    if (!hasFile) {
+      setWebsiteSettingsError("Upload at least one PDF");
+      return;
+    }
+
+    try {
+      setWebsiteSettingsError("");
+      setIsWebsiteSettingsSaving(true);
+      const response = await fetch(`${API_BASE_URL}/admin/website-settings`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to update website settings");
+      }
+
+      showToast("success", result.message || "Website settings updated successfully");
+      setWebsiteSettingsData(result.data || null);
+      setHasLoadedWebsiteSettings(true);
+      setWebsiteSettingsFiles({
+        privacyPolicy: null,
+        termsOfService: null,
+        disclaimer: null,
+        accountDeletion: null,
+      });
+      form.reset();
+    } catch (error) {
+      setWebsiteSettingsError(error instanceof Error ? error.message : "Unable to update website settings");
+    } finally {
+      setIsWebsiteSettingsSaving(false);
     }
   }
 
@@ -4564,7 +4694,7 @@ export default function Home() {
     if (routeView) {
       setActiveView(routeView);
 
-      setIsGeneralMenuOpen(["General", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].includes(routeView));
+      setIsGeneralMenuOpen(["General", "Website Settings", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].includes(routeView));
       setIsUserManagementMenuOpen(routeView === "Users");
       setIsEmployeeManagementMenuOpen(routeView === "Employees" || routeView === "Roles" || routeView === "Login History");
       setIsSubscriptionsMenuOpen(routeView === "Basic Subscriptions" || routeView === "Repair Subscriptions");
@@ -4598,6 +4728,12 @@ export default function Home() {
       loadGeneralSettings();
     }
   }, [activeView, adminUser?.token, hasLoadedGeneral, isGeneralLoading]);
+
+  useEffect(() => {
+    if (activeView === "Website Settings" && adminUser?.token && !hasLoadedWebsiteSettings && !isWebsiteSettingsLoading) {
+      loadWebsiteSettings();
+    }
+  }, [activeView, adminUser?.token, hasLoadedWebsiteSettings, isWebsiteSettingsLoading]);
 
   useEffect(() => {
     if (activeView === "Homepage Themes" && adminUser?.token && !hasLoadedHomepageThemes && !isHomepageThemesLoading) {
@@ -5134,6 +5270,7 @@ export default function Home() {
     const canUpdateHomepageThemes = hasActionPermission("Homepage Themes", "update");
     const canDeleteHomepageThemes = hasActionPermission("Homepage Themes", "delete");
     const canUpdateGeneral = hasActionPermission("General", "update");
+    const canUpdateWebsiteSettings = hasActionPermission("Website Settings", "update");
     const canUpdateLegal = hasActionPermission("Legal Center", "update");
     const canCreateNotifications = hasActionPermission("Notifications", "create");
     const canCreateFaqs = hasActionPermission("FAQs", "create");
@@ -5638,8 +5775,8 @@ export default function Home() {
                 </button>
                 {item === "Dashboard" ? (
                   <>
-                    {["General", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].some((view) => hasViewPermission(view as AppView)) ? (
-                      <div className={`sidebar-group ${activeView === "General" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "FAQs" ? "active" : ""}`}>
+                    {["General", "Website Settings", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].some((view) => hasViewPermission(view as AppView)) ? (
+                      <div className={`sidebar-group ${activeView === "General" || activeView === "Website Settings" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "FAQs" ? "active" : ""}`}>
                         <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
                           <span className="menu-icon">{menuIcons.General}</span>
                           General
@@ -5648,6 +5785,7 @@ export default function Home() {
                         {isGeneralMenuOpen ? (
                           <div className="sidebar-submenu">
                             {hasViewPermission("General") ? <button className={activeView === "General" ? "active" : ""} type="button" onClick={() => openAdminView("General")}><span className="menu-icon">{menuIcons["Site Settings"]}</span>Site Settings</button> : null}
+                            {hasViewPermission("Website Settings") ? <button className={activeView === "Website Settings" ? "active" : ""} type="button" onClick={() => openAdminView("Website Settings")}><span className="menu-icon">{menuIcons["Site Settings"]}</span>Website Settings</button> : null}
                             {hasViewPermission("Homepage Themes") ? <button className={activeView === "Homepage Themes" ? "active" : ""} type="button" onClick={() => openAdminView("Homepage Themes")}><span className="menu-icon">{menuIcons["Homepage Themes"]}</span>Homepage Themes</button> : null}
                             {hasViewPermission("Legal Center") ? <button className={activeView === "Legal Center" ? "active" : ""} type="button" onClick={() => openAdminView("Legal Center")}><span className="menu-icon">{menuIcons["Legal Center"]}</span>Legal Center</button> : null}
                             {hasViewPermission("Notifications") ? <button className={activeView === "Notifications" ? "active" : ""} type="button" onClick={() => openAdminView("Notifications")}><span className="menu-icon">{menuIcons.Notifications}</span>Notifications</button> : null}
@@ -5903,6 +6041,73 @@ export default function Home() {
                     <div className="general-actions">
                       <button disabled={isGeneralLoading || isGeneralSaving} type="submit">
                         {isGeneralSaving ? "Saving..." : "Save"}
+                      </button>
+                    </div>
+                  ) : null}
+                </form>
+              </>
+            ) : activeView === "Website Settings" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Website Settings</h2>
+                    <p>Upload website PDF documents</p>
+                  </div>
+                </section>
+
+                {websiteSettingsError ? <p className="dashboard-error">{websiteSettingsError}</p> : null}
+
+                <form className="general-form panel" onSubmit={updateWebsiteSettings}>
+                  {isWebsiteSettingsLoading ? <span className="table-loader" /> : null}
+                  <label>
+                    Privacy Policy
+                    <input
+                      accept="application/pdf"
+                      type="file"
+                      onChange={(event) => setWebsiteSettingsFiles((files) => ({ ...files, privacyPolicy: event.target.files?.[0] || null }))}
+                    />
+                    {(websiteSettingsFiles.privacyPolicy?.name || websiteSettingsData?.privacyPolicy) ? (
+                      <span className="settings-file-name">{websiteSettingsFiles.privacyPolicy?.name || getWebsiteSettingsFileName(websiteSettingsData?.privacyPolicy)}</span>
+                    ) : null}
+                  </label>
+                  <label>
+                    Terms Of Service
+                    <input
+                      accept="application/pdf"
+                      type="file"
+                      onChange={(event) => setWebsiteSettingsFiles((files) => ({ ...files, termsOfService: event.target.files?.[0] || null }))}
+                    />
+                    {(websiteSettingsFiles.termsOfService?.name || websiteSettingsData?.termsOfService) ? (
+                      <span className="settings-file-name">{websiteSettingsFiles.termsOfService?.name || getWebsiteSettingsFileName(websiteSettingsData?.termsOfService)}</span>
+                    ) : null}
+                  </label>
+                  <label>
+                    Disclaimer
+                    <input
+                      accept="application/pdf"
+                      type="file"
+                      onChange={(event) => setWebsiteSettingsFiles((files) => ({ ...files, disclaimer: event.target.files?.[0] || null }))}
+                    />
+                    {(websiteSettingsFiles.disclaimer?.name || websiteSettingsData?.disclaimer) ? (
+                      <span className="settings-file-name">{websiteSettingsFiles.disclaimer?.name || getWebsiteSettingsFileName(websiteSettingsData?.disclaimer)}</span>
+                    ) : null}
+                  </label>
+                  <label>
+                    Account Deletion
+                    <input
+                      accept="application/pdf"
+                      type="file"
+                      onChange={(event) => setWebsiteSettingsFiles((files) => ({ ...files, accountDeletion: event.target.files?.[0] || null }))}
+                    />
+                    {(websiteSettingsFiles.accountDeletion?.name || websiteSettingsData?.accountDeletion) ? (
+                      <span className="settings-file-name">{websiteSettingsFiles.accountDeletion?.name || getWebsiteSettingsFileName(websiteSettingsData?.accountDeletion)}</span>
+                    ) : null}
+                  </label>
+
+                  {canUpdateWebsiteSettings ? (
+                    <div className="general-actions">
+                      <button disabled={isWebsiteSettingsLoading || isWebsiteSettingsSaving} type="submit">
+                        {isWebsiteSettingsSaving ? "Saving..." : "Save"}
                       </button>
                     </div>
                   ) : null}
