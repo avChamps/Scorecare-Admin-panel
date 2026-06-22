@@ -4603,7 +4603,7 @@ export default function Home() {
     if (activeView === "Homepage Themes" && adminUser?.token && !hasLoadedHomepageThemes && !isHomepageThemesLoading) {
       loadHomepageThemes();
     }
-  }, [activeView, adminUser?.token, hasLoadedHomepageThemes, isHomepageThemesLoading]);
+  }, [activeView, adminUser?.token, hasLoadedHomepageThemes]);
 
   useEffect(() => {
     if (activeView === "Legal Center" && adminUser?.token && !hasLoadedLegalContent && !isLegalContentLoading) {
