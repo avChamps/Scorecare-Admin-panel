@@ -388,11 +388,15 @@ select {
 }
 
 .sidebar-brand img {
+  background: #f8fbff;
+  border: 1px solid rgba(159, 180, 204, 0.28);
+  border-radius: 14px;
   display: block;
   height: auto;
-  max-height: 88px;
+  max-height: 92px;
   object-fit: contain;
-  width: 148px;
+  padding: 10px 14px;
+  width: 174px;
 }
 
 .sidebar-close {
@@ -1108,67 +1112,66 @@ select {
 }
 
 .users-status-grid {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: #162331;
+  border: 1px solid #26384c;
   display: grid;
+  gap: 1px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 24px;
-  border-radius: 5px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .users-status-card {
-  background: transparent;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 0;
-  border-left: 0;
-  border-top: 0;
+  background: #101c28;
+  border: 0;
   cursor: pointer;
-  min-height: 116px;
-  padding: 24px;
+  min-height: 108px;
+  padding: 22px 24px;
   position: relative;
   text-align: left;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .users-status-card:hover {
-  background: #f9fafb;
-}
-
-.users-status-card:last-child {
-  border-right: 0;
+  background: #142233;
 }
 
 .users-status-card.active::after {
   background: #168f86;
-  bottom: 0;
   content: "";
-  height: 3px;
-  left: 0;
+  inset: auto 18px 0;
+  height: 2px;
   position: absolute;
-  right: 0;
+}
+
+.users-status-card.active {
+  background: #14283a;
+  box-shadow: inset 0 0 0 1px rgba(22, 143, 134, 0.45);
 }
 
 .users-status-card span {
-  color: #6b7280;
+  color: #9fb4cc;
   display: block;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   margin-bottom: 10px;
 }
 
 .users-status-card strong {
-  color: #111827;
+  color: #eaf2ff;
   display: block;
   font-size: 32px;
-  font-weight: 500;
+  font-weight: 700;
   line-height: 1;
 }
 
 .users-status-card strong.tone-warning {
-  color: #a86b14;
+  color: #f2b84b;
 }
 
 .users-status-card strong.tone-success {
-  color: #167c3c;
+  color: #20c997;
 }
 
 .dashboard-grid {
@@ -4326,7 +4329,7 @@ select {
   }
 
   .users-status-card {
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid #26384c;
     border-right: 0;
   }
 
@@ -4398,8 +4401,8 @@ select {
   }
 
   .sidebar-brand img {
-    max-height: 82px;
-    max-width: 136px;
+    max-height: 88px;
+    max-width: 160px;
   }
 
   .sidebar-close {
