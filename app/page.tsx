@@ -578,25 +578,41 @@ function DateFilter({ label, value, onChange, className = "" }: { label: string;
 type UserRow = {
   id: string;
   publicId: string;
-  fullName: string;
+  fullName: string | null;
   mobileNumber: string;
-  email: string;
+  email: string | null;
   panNumber?: string | null;
   dob?: string | null;
   dateOfBirth?: string | null;
+  isAdmin?: boolean;
   status: string;
   accessType: string;
   subscriptionStatus: string;
+  subscriptionAmount?: number | string | null;
+  latestSubscriptionAmount?: number | string | null;
   subscriptionStartedAt: string | null;
   subscriptionDueAt: string | null;
+  subscriptionEndsAt?: string | null;
   planUpdatedByUserName?: string | null;
+  planUpdatedBy?: string | null;
   creditScore: string | null;
+  creditScoreLastCheckedAt?: string | null;
   totalMessages: number;
   loans: {
     total: number;
     latestStatus: string | null;
+    latestAppliedAt?: string | null;
   };
+  lastLoginAt?: string | null;
   createdAt: string;
+  updatedAt?: string | null;
+};
+
+type UserDetail = {
+  user: UserRow;
+  kycStatus: Record<string, { status: string; verifiedAt?: string | null; completedAt?: string | null }>;
+  bureauScores: Array<{ bureau?: string; name?: string; reportType?: string | null; score?: number | string | null; creditScore?: number | string | null; providerStatusCode?: number | null; providerMessage?: string | null; status?: string | null; syncedAt?: string | null; lastSyncedAt?: string | null }>;
+  recentActivity: Array<{ type: string; label: string; status: string; amount?: number | string | null; currency?: string | null; occurredAt: string | null }>;
 };
 
 type SubscriptionPlan = {
@@ -683,6 +699,12 @@ type CibilRepairContent = {
 
 type UsersResponse = {
   users: UserRow[];
+  counts?: {
+    otp_login_no_pan?: number;
+    pan_submitted?: number;
+    checkout_started?: number;
+    subscribed?: number;
+  };
   pagination: {
     page: number;
     limit: number;
@@ -1179,6 +1201,28 @@ type GeneralSettings = {
   prompt_message: string;
 };
 
+const emptyGeneralSettings: GeneralSettings = {
+  website: "",
+  email: "",
+  mobileNumber: "",
+  whatsappNumber: "",
+  selectedLanguage: "",
+  address: "",
+  prompt_message: "",
+};
+
+function normalizeGeneralSettings(settings?: Partial<GeneralSettings> | null, fallback = emptyGeneralSettings): GeneralSettings {
+  return {
+    website: settings?.website ?? fallback.website ?? "",
+    email: settings?.email ?? fallback.email ?? "",
+    mobileNumber: settings?.mobileNumber ?? fallback.mobileNumber ?? "",
+    whatsappNumber: settings?.whatsappNumber ?? fallback.whatsappNumber ?? "",
+    selectedLanguage: settings?.selectedLanguage ?? fallback.selectedLanguage ?? "",
+    address: settings?.address ?? fallback.address ?? "",
+    prompt_message: settings?.prompt_message ?? fallback.prompt_message ?? "",
+  };
+}
+
 type WebsiteSettingsFiles = {
   privacyPolicy: File | null;
   termsOfService: File | null;
@@ -1269,8 +1313,12 @@ export default function Home() {
   const [usersSearch, setUsersSearch] = useState("");
   const [usersFromDate, setUsersFromDate] = useState("");
   const [usersToDate, setUsersToDate] = useState("");
+  const [usersStatus, setUsersStatus] = useState("otp_login_no_pan");
   const [usersError, setUsersError] = useState("");
   const [isUsersLoading, setIsUsersLoading] = useState(false);
+  const [selectedUserDetail, setSelectedUserDetail] = useState<UserDetail | null>(null);
+  const [selectedUserError, setSelectedUserError] = useState("");
+  const [isUserDetailLoading, setIsUserDetailLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [reportDownloadsData, setReportDownloadsData] = useState<CreditReportDownloadsResponse | null>(null);
   const [reportDownloadsSearch, setReportDownloadsSearch] = useState("");
@@ -1408,19 +1456,15 @@ export default function Home() {
   const [repairSubscriptionsToDate, setRepairSubscriptionsToDate] = useState("");
   const [repairSubscriptionsError, setRepairSubscriptionsError] = useState("");
   const [isRepairSubscriptionsLoading, setIsRepairSubscriptionsLoading] = useState(false);
-  const [generalSettings, setGeneralSettings] = useState<GeneralSettings>({
-    website: "",
-    email: "",
-    mobileNumber: "",
-    whatsappNumber: "",
-    selectedLanguage: "",
-    address: "",
-    prompt_message: "",
-  });
+  const [generalSettings, setGeneralSettings] = useState<GeneralSettings>(emptyGeneralSettings);
   const [generalError, setGeneralError] = useState("");
   const [isGeneralLoading, setIsGeneralLoading] = useState(false);
   const [isGeneralSaving, setIsGeneralSaving] = useState(false);
   const [hasLoadedGeneral, setHasLoadedGeneral] = useState(false);
+  const generalFormSettings = normalizeGeneralSettings(generalSettings);
+  const updateGeneralSetting = <K extends keyof GeneralSettings>(key: K, value: GeneralSettings[K]) => {
+    setGeneralSettings((settings) => normalizeGeneralSettings({ ...settings, [key]: value }));
+  };
   const [websiteSettingsFiles, setWebsiteSettingsFiles] = useState<WebsiteSettingsFiles>({
     privacyPolicy: null,
     termsOfService: null,
@@ -1577,7 +1621,7 @@ export default function Home() {
     }
 
     if (view === "Users" || view === "Basic Subscriptions") {
-      loadUsers(1, usersSearch, view === "Basic Subscriptions");
+      loadUsers(1, usersSearch, view === "Basic Subscriptions", view === "Users" ? usersStatus : "");
     }
 
     if (view === "Repair Subscriptions") {
@@ -1756,7 +1800,7 @@ export default function Home() {
     }
   }
 
-  async function loadUsers(page = 1, search = usersSearch, subscribedOnly = activeView === "Basic Subscriptions") {
+  async function loadUsers(page = 1, search = usersSearch, subscribedOnly = activeView === "Basic Subscriptions", status = activeView === "Users" ? usersStatus : "") {
     if (!adminUser?.token) {
       return;
     }
@@ -1772,6 +1816,10 @@ export default function Home() {
 
       if (subscribedOnly) {
         params.set("subscribedOnly", "true");
+      }
+
+      if (status) {
+        params.set("status", status);
       }
 
       if (usersFromDate) {
@@ -1803,6 +1851,40 @@ export default function Home() {
       setUsersError(error instanceof Error ? error.message : "Unable to load users");
     } finally {
       setIsUsersLoading(false);
+    }
+  }
+
+  async function loadUserDetail(publicId: string) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setSelectedUserError("");
+      setIsUserDetailLoading(true);
+      setSelectedUserDetail(null);
+
+      const response = await fetch(`${API_BASE_URL}/admin/users/${publicId}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load user details");
+      }
+
+      setSelectedUserDetail(result.data);
+    } catch (error) {
+      setSelectedUserError(error instanceof Error ? error.message : "Unable to load user details");
+    } finally {
+      setIsUserDetailLoading(false);
     }
   }
 
@@ -1949,7 +2031,7 @@ export default function Home() {
       const fileName = disposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i)?.[1];
 
       link.href = url;
-      link.download = fileName ? decodeURIComponent(fileName) : `${toFileName(user.fullName)}-cibil-report.pdf`;
+      link.download = fileName ? decodeURIComponent(fileName) : `${toFileName(user.fullName || user.mobileNumber)}-cibil-report.pdf`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -2649,15 +2731,7 @@ export default function Home() {
         throw new Error(result.message || "Unable to load general settings");
       }
 
-      setGeneralSettings({
-        website: result.data?.website || "",
-        email: result.data?.email || "",
-        mobileNumber: result.data?.mobileNumber || "",
-        whatsappNumber: result.data?.whatsappNumber || "",
-        selectedLanguage: result.data?.selectedLanguage || "",
-        address: result.data?.address || "",
-        prompt_message: result.data?.prompt_message || "",
-      });
+      setGeneralSettings(normalizeGeneralSettings(result.data));
       setHasLoadedGeneral(true);
     } catch (error) {
       setGeneralError(error instanceof Error ? error.message : "Unable to load general settings");
@@ -2971,7 +3045,7 @@ export default function Home() {
           Authorization: `Bearer ${adminUser.token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(generalSettings),
+        body: JSON.stringify(generalFormSettings),
       });
       const result = await response.json();
 
@@ -2988,15 +3062,7 @@ export default function Home() {
 
       showToast("success", "General settings updated successfully");
       setHasLoadedGeneral(true);
-      setGeneralSettings({
-        website: result.data?.website || generalSettings.website,
-        email: result.data?.email || generalSettings.email,
-        mobileNumber: result.data?.mobileNumber || generalSettings.mobileNumber,
-        whatsappNumber: result.data?.whatsappNumber || generalSettings.whatsappNumber,
-        selectedLanguage: result.data?.selectedLanguage || generalSettings.selectedLanguage,
-        address: result.data?.address ?? generalSettings.address,
-        prompt_message: result.data?.prompt_message ?? generalSettings.prompt_message,
-      });
+      setGeneralSettings(normalizeGeneralSettings(result.data, generalSettings));
     } catch (error) {
       setGeneralError(error instanceof Error ? error.message : "Unable to update general settings");
     } finally {
@@ -4623,7 +4689,8 @@ export default function Home() {
     setUsersSearch("");
     setUsersFromDate("");
     setUsersToDate("");
-    loadUsers(1, "");
+    setUsersStatus("otp_login_no_pan");
+    loadUsers(1, "", activeView === "Basic Subscriptions", activeView === "Users" ? "otp_login_no_pan" : "");
   }
 
   function resetReportDownloadFilters() {
@@ -5397,16 +5464,16 @@ export default function Home() {
     const disputesStatusGraph = dashboardCounts?.graphs.disputesByStatus ?? [];
     const totalRevenue = dashboardCounts?.revenue?.total ?? dashboardCounts?.amount ?? 0;
     const kpiCards = [
-      { label: "Total Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, icon: dashboardIcons.users, trend: "+12%", view: "Users" as AppView },
-      { label: "Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}`, meta: "Total collected", icon: dashboardIcons.revenue, trend: "+8%", view: "Basic Subscription" as AppView },
-      { label: "Subscriptions", value: dashboardCounts?.subscriptions ?? 0, meta: `${dashboardCounts?.upcomingOverdues ?? 0} past due`, icon: dashboardIcons.subscriptions, trend: "+5%", view: "Basic Subscriptions" as AppView },
-      { label: "Credit Reports", value: dashboardCounts?.totalCreditReports ?? 0, meta: `${dashboardCounts?.reportsWithScore ?? 0} with score`, icon: dashboardIcons.reports, trend: "0%", view: "Report Downloads" as AppView },
-      { label: "Messages", value: dashboardCounts?.totalMessages ?? 0, meta: "Total chats", icon: dashboardIcons.messages, trend: "+3%", view: "Chats" as AppView },
-      { label: "Feedback", value: dashboardCounts?.totalFeedback ?? 0, meta: "User ratings", icon: dashboardIcons.feedback, trend: "+6%", view: "Feedback" as AppView },
-      { label: "Notifications", value: dashboardCounts?.totalNotifications ?? 0, meta: `${dashboardCounts?.unreadNotifications ?? 0} unread`, icon: dashboardIcons.notifications, trend: "0%", view: "Notifications" as AppView },
-      { label: "Employees", value: dashboardCounts?.employees?.total ?? 0, meta: `${dashboardCounts?.employees?.active ?? 0} active`, icon: dashboardIcons.employees, trend: "0%", view: "Employees" as AppView },
-      { label: "Roles", value: dashboardCounts?.roles?.total ?? 0, meta: `${dashboardCounts?.roles?.active ?? 0} active`, icon: dashboardIcons.roles, trend: "0%", view: "Roles" as AppView },
-      { label: "API History", value: dashboardCounts?.apiHistoryCount ?? 0, meta: "Credit bureau requests", icon: dashboardIcons.apiLogs, trend: "0%", view: "API Logs" as AppView },
+      { label: "Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, icon: dashboardIcons.users, trend: "2.29% ↗", view: "Users" as AppView, tone: "orange" },
+      { label: "Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}`, meta: "Total collected", icon: dashboardIcons.revenue, trend: "2.19% ↗", view: "Basic Subscription" as AppView, tone: "green" },
+      { label: "Subscriptions", value: dashboardCounts?.subscriptions ?? 0, meta: `${dashboardCounts?.upcomingOverdues ?? 0} past due`, icon: dashboardIcons.subscriptions, trend: "3.19% ↘", view: "Basic Subscriptions" as AppView, tone: "blue" },
+      { label: "Credit Reports", value: dashboardCounts?.totalCreditReports ?? 0, meta: `${dashboardCounts?.reportsWithScore ?? 0} with score`, icon: dashboardIcons.reports, trend: "0.00% →", view: "Report Downloads" as AppView, tone: "purple" },
+      { label: "Messages", value: dashboardCounts?.totalMessages ?? 0, meta: "Total chats", icon: dashboardIcons.messages, trend: "1.24% ↗", view: "Chats" as AppView, tone: "cyan" },
+      { label: "Feedback", value: dashboardCounts?.totalFeedback ?? 0, meta: "User ratings", icon: dashboardIcons.feedback, trend: "2.02% ↗", view: "Feedback" as AppView, tone: "red" },
+      { label: "Notifications", value: dashboardCounts?.totalNotifications ?? 0, meta: `${dashboardCounts?.unreadNotifications ?? 0} unread`, icon: dashboardIcons.notifications, trend: "0.00% →", view: "Notifications" as AppView, tone: "orange" },
+      { label: "Employees", value: dashboardCounts?.employees?.total ?? 0, meta: `${dashboardCounts?.employees?.active ?? 0} active`, icon: dashboardIcons.employees, trend: "0.00% →", view: "Employees" as AppView, tone: "green" },
+      { label: "Roles", value: dashboardCounts?.roles?.total ?? 0, meta: `${dashboardCounts?.roles?.active ?? 0} active`, icon: dashboardIcons.roles, trend: "0.00% →", view: "Roles" as AppView, tone: "blue" },
+      { label: "API History", value: dashboardCounts?.apiHistoryCount ?? 0, meta: "Credit bureau requests", icon: dashboardIcons.apiLogs, trend: "0.00% →", view: "API Logs" as AppView, tone: "purple" },
     ];
     const pieColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444", "#7c3aed"];
     const subscriptionColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444"];
@@ -5471,6 +5538,33 @@ export default function Home() {
     const canUpdateSubscriptions = hasActionPermission("Basic Subscriptions", "update");
     const canExportLoans = hasActionPermission("Loans", "export");
     const canUpdateLoans = hasActionPermission("Loans", "update");
+    const loadedUsers = usersData?.users ?? [];
+    const userStatusCards = [
+      {
+        label: "OTP login, no PAN",
+        value: usersData?.counts?.otp_login_no_pan ?? loadedUsers.filter((user) => !user.panNumber).length,
+        status: "otp_login_no_pan",
+        tone: "default",
+      },
+      {
+        label: "PAN submitted",
+        value: usersData?.counts?.pan_submitted ?? loadedUsers.filter((user) => Boolean(user.panNumber)).length,
+        status: "pan_submitted",
+        tone: "default",
+      },
+      {
+        label: "Checkout started",
+        value: usersData?.counts?.checkout_started ?? loadedUsers.filter((user) => /checkout|pending|initiated/i.test(user.subscriptionStatus)).length,
+        status: "checkout_started",
+        tone: "warning",
+      },
+      {
+        label: "Subscribed",
+        value: usersData?.counts?.subscribed ?? loadedUsers.filter((user) => /active|subscribed/i.test(user.subscriptionStatus)).length,
+        status: "subscribed",
+        tone: "success",
+      },
+    ];
     const usersColumns = ["Name", "Mobile", "Email", "Access", "Subscription", "Started At", "Due At", "Credit Score", "Messages", "Loans", "Status"];
     const usersRows = usersData?.users.map((user) => [
       user.fullName,
@@ -5942,12 +6036,18 @@ export default function Home() {
       <main className="admin-layout">
         <aside className={`sidebar ${isSidebarCollapsed ? "collapsed" : ""}`}>
           <div className="sidebar-brand">
-            <img src="/scorecare-logo.PNG" alt="ScoreCare" />
+            <img src="/scorecare-logo-sidebar.png" alt="ScoreCare" />
             {/* <button className="sidebar-close" type="button" onClick={() => setIsSidebarCollapsed(true)}>
               ×
             </button> */}
           </div>
           <nav>
+                    {hasViewPermission("Dashboard") ? (
+                      <button className={activeView === "Dashboard" ? "active" : ""} type="button" onClick={() => openAdminView("Dashboard")}>
+                        <span className="menu-icon">{menuIcons.Dashboard}</span>
+                        Dashboard
+                      </button>
+                    ) : null}
                     {["General", "Website Settings", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].some((view) => hasViewPermission(view as AppView)) ? (
                       <div className={`sidebar-group ${activeView === "General" || activeView === "Website Settings" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "FAQs" ? "active" : ""}`}>
                         <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
@@ -6149,8 +6249,8 @@ export default function Home() {
                     Website
                     <input
                       required
-                      value={generalSettings.website}
-                      onChange={(event) => setGeneralSettings((settings) => ({ ...settings, website: event.target.value }))}
+                      value={generalFormSettings.website}
+                      onChange={(event) => updateGeneralSetting("website", event.target.value)}
                     />
                   </label>
                   <label>
@@ -6158,8 +6258,8 @@ export default function Home() {
                     <input
                       required
                       type="email"
-                      value={generalSettings.email}
-                      onChange={(event) => setGeneralSettings((settings) => ({ ...settings, email: event.target.value }))}
+                      value={generalFormSettings.email}
+                      onChange={(event) => updateGeneralSetting("email", event.target.value)}
                     />
                   </label>
                   <label>
@@ -6168,8 +6268,8 @@ export default function Home() {
                       required
                       inputMode="numeric"
                       maxLength={10}
-                      value={generalSettings.mobileNumber}
-                      onChange={(event) => setGeneralSettings((settings) => ({ ...settings, mobileNumber: event.target.value.replace(/\D/g, "") }))}
+                      value={generalFormSettings.mobileNumber}
+                      onChange={(event) => updateGeneralSetting("mobileNumber", event.target.value.replace(/\D/g, ""))}
                     />
                   </label>
                   <label>
@@ -6178,32 +6278,32 @@ export default function Home() {
                       required
                       inputMode="numeric"
                       maxLength={10}
-                      value={generalSettings.whatsappNumber}
-                      onChange={(event) => setGeneralSettings((settings) => ({ ...settings, whatsappNumber: event.target.value.replace(/\D/g, "") }))}
+                      value={generalFormSettings.whatsappNumber}
+                      onChange={(event) => updateGeneralSetting("whatsappNumber", event.target.value.replace(/\D/g, ""))}
                     />
                   </label>
                   <label>
                     Address
                     <textarea
                       rows={4}
-                      value={generalSettings.address}
-                      onChange={(event) => setGeneralSettings((settings) => ({ ...settings, address: event.target.value }))}
+                      value={generalFormSettings.address}
+                      onChange={(event) => updateGeneralSetting("address", event.target.value)}
                     />
                   </label>
                   <label>
                     Prompt Message
                     <textarea
                       rows={4}
-                      value={generalSettings.prompt_message}
-                      onChange={(event) => setGeneralSettings((settings) => ({ ...settings, prompt_message: event.target.value }))}
+                      value={generalFormSettings.prompt_message}
+                      onChange={(event) => updateGeneralSetting("prompt_message", event.target.value)}
                     />
                   </label>
                   {/* <label>
                     Selected Language
                     <input
                       required
-                      value={generalSettings.selectedLanguage}
-                      onChange={(event) => setGeneralSettings((settings) => ({ ...settings, selectedLanguage: event.target.value }))}
+                      value={generalFormSettings.selectedLanguage}
+                      onChange={(event) => updateGeneralSetting("selectedLanguage", event.target.value)}
                     />
                   </label> */}
                   {canUpdateGeneral ? (
@@ -6807,22 +6907,6 @@ export default function Home() {
 
                 {plansBenefitsTab === "plans" ? (
                   <>
-                    {canCreatePlans ? (
-                      <div className="plans-toolbar">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingAdminPlanId(null);
-                            setAdminPlanForm(emptyAdminPlanForm);
-                            setIsAdminPlanModalOpen(true);
-                          }}
-                        >
-                          <ActionIcon type="add" />
-                          Add Plan
-                        </button>
-                      </div>
-                    ) : null}
-
                     <section className="admin-plans-list">
                       {adminPlans.map((plan) => (
                         <article className="admin-plan-card panel" key={plan.publicId}>
@@ -6867,10 +6951,10 @@ export default function Home() {
                   <form className="admin-plan-form panel" onSubmit={saveCibilRepairContent}>
                     <div className="admin-plan-form-header">
                       <h3>{cibilRepairTab === "plans" ? "Repair Plans" : "Timelines"}</h3>
-                      {canCreatePlans ? (
-                        <button type="button" onClick={cibilRepairTab === "plans" ? addCibilRepairPlan : addCibilRepairTimeline}>
+                      {canCreatePlans && cibilRepairTab === "timelines" ? (
+                        <button type="button" onClick={addCibilRepairTimeline}>
                           <ActionIcon type="add" />
-                          {cibilRepairTab === "plans" ? "Add Plan" : "Add Timeline"}
+                          Add Timeline
                         </button>
                       ) : null}
                     </div>
@@ -7374,6 +7458,23 @@ export default function Home() {
                   <span>{usersData?.pagination.total ?? 0} users</span>
                 </section>
 
+                <section className="users-status-grid">
+                  {userStatusCards.map((card, index) => (
+                    <button
+                      className={`users-status-card ${usersStatus === card.status ? "active" : ""}`}
+                      key={card.label}
+                      type="button"
+                      onClick={() => {
+                        setUsersStatus(card.status);
+                        loadUsers(1, usersSearch, false, card.status);
+                      }}
+                    >
+                      <span>{card.label}</span>
+                      <strong className={`tone-${card.tone}`}>{card.value}</strong>
+                    </button>
+                  ))}
+                </section>
+
                 <div className="mobile-toolbar-actions">
                   <button type="button" onClick={() => setIsMobileFiltersOpen((current) => !current)}>
                     Filter
@@ -7412,6 +7513,12 @@ export default function Home() {
                   columns={usersColumns}
                   emptyText={isUsersLoading ? "Loading users..." : "No users found"}
                   isLoading={isUsersLoading}
+                  onRowClick={(rowIndex) => {
+                    const user = usersData?.users[rowIndex];
+                    if (user?.publicId) {
+                      loadUserDetail(user.publicId);
+                    }
+                  }}
                   pagination={
                     usersData
                       ? {
@@ -7949,13 +8056,27 @@ export default function Home() {
               </>
             ) : (
               <section className="analytics-dashboard">
-                <div className="analytics-hero">
-                  <div>
-                    <span>ScoreCare Analytics</span>
-                    <h2>Welcome back, {adminUser?.fullName || "Admin"}</h2>
-                    <p>Live operational overview across users, revenue, service activity, and access management.</p>
+                <div className="analytics-hero-grid">
+                  <div className="analytics-hero">
+                    <div>
+                      <span>👋 Hello {adminUser?.fullName?.split(" ")[0] || "Admin"},</span>
+                      <h2>Welcome to your ScoreCare Dashboard!</h2>
+                      <p>Monitor users, track revenue, and review service activity in one place.</p>
+                      <button type="button" onClick={() => openAdminView("Users")}>Start AI</button>
+                    </div>
                   </div>
-                  <strong>₹{totalRevenue.toLocaleString("en-IN")}</strong>
+                  <aside className="analytics-ideas-card">
+                    <div className="analytics-ideas-top">
+                      <h3>Ideas for You</h3>
+                      <div>
+                        <button type="button" aria-label="Previous idea">‹</button>
+                        <button type="button" aria-label="Next idea">›</button>
+                      </div>
+                    </div>
+                    <h2>Create a report for your product</h2>
+                    <p>Review users, subscriptions, revenue, and service performance from the latest dashboard data.</p>
+                    <button type="button" onClick={() => openAdminView("Report Downloads")}>Read Now</button>
+                  </aside>
                 </div>
 
                 <section className="table-toolbar dashboard-filter-toolbar">
@@ -7985,7 +8106,7 @@ export default function Home() {
                           }
                         }}
                       >
-                        <div className="analytics-kpi-icon">{card.icon}</div>
+                        <div className={`analytics-kpi-icon ${card.tone}`}>{card.icon}</div>
                         <div>
                           <span>{card.label}</span>
                           <strong>{card.value}</strong>
@@ -8603,6 +8724,115 @@ export default function Home() {
             </section>
           </div>
         ) : null}
+        {isUserDetailLoading || selectedUserError || selectedUserDetail ? (
+          <div className="user-detail-backdrop" onClick={() => {
+            setSelectedUserDetail(null);
+            setSelectedUserError("");
+          }}>
+            <aside className="user-detail-drawer" onClick={(event) => event.stopPropagation()}>
+              <header>
+                <div className="user-detail-profile">
+                  <span>{selectedUserDetail?.user.fullName?.slice(0, 2).toUpperCase() || selectedUserDetail?.user.mobileNumber.slice(-2) || "--"}</span>
+                  <div>
+                    <h3>{selectedUserDetail?.user.fullName || "User details"}</h3>
+                    <p>
+                      {[selectedUserDetail?.user.panNumber, selectedUserDetail?.user.mobileNumber].filter(Boolean).join(" · ") || "-"}
+                    </p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => {
+                  setSelectedUserDetail(null);
+                  setSelectedUserError("");
+                }}>
+                  ×
+                </button>
+              </header>
+
+              {isUserDetailLoading ? (
+                <div className="user-detail-loading">
+                  <span className="table-loader" />
+                </div>
+              ) : selectedUserError ? (
+                <p className="dashboard-error">{selectedUserError}</p>
+              ) : selectedUserDetail ? (
+                <>
+                  <section>
+                    <h4>User Info</h4>
+                    <div className="user-detail-metrics">
+                      <span><small>Email</small><strong>{selectedUserDetail.user.email || "-"}</strong></span>
+                      <span><small>DOB</small><strong>{formatDate(selectedUserDetail.user.dateOfBirth || null)}</strong></span>
+                      <span><small>Access</small><strong>{formatLabel(selectedUserDetail.user.accessType || "-")}</strong></span>
+                      <span><small>Status</small><strong>{formatLabel(selectedUserDetail.user.status || "-")}</strong></span>
+                      <span><small>Admin</small><strong>{selectedUserDetail.user.isAdmin ? "Yes" : "No"}</strong></span>
+                      <span><small>Last login</small><strong>{formatDateTime(selectedUserDetail.user.lastLoginAt || null)}</strong></span>
+                      <span><small>Created</small><strong>{formatDateTime(selectedUserDetail.user.createdAt || null)}</strong></span>
+                      <span><small>Updated</small><strong>{formatDateTime(selectedUserDetail.user.updatedAt || null)}</strong></span>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4>Subscription</h4>
+                    <div className="user-detail-metrics">
+                      <span><small>Status</small><strong>{formatLabel(selectedUserDetail.user.subscriptionStatus || "-")}</strong></span>
+                      <span><small>Amount</small><strong>INR {Number(selectedUserDetail.user.subscriptionAmount || 0).toLocaleString("en-IN")}</strong></span>
+                      <span><small>Latest amount</small><strong>INR {Number(selectedUserDetail.user.latestSubscriptionAmount || 0).toLocaleString("en-IN")}</strong></span>
+                      <span><small>Started</small><strong>{formatDateTime(selectedUserDetail.user.subscriptionStartedAt || null)}</strong></span>
+                      <span><small>Due</small><strong>{formatDateTime(selectedUserDetail.user.subscriptionDueAt || null)}</strong></span>
+                      <span><small>Ends</small><strong>{formatDateTime(selectedUserDetail.user.subscriptionEndsAt || null)}</strong></span>
+                      <span><small>Updated by</small><strong>{selectedUserDetail.user.planUpdatedByUserName || selectedUserDetail.user.planUpdatedBy || "-"}</strong></span>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4>KYC Status</h4>
+                    <div className="user-detail-list">
+                      {Object.entries(selectedUserDetail.kycStatus).map(([key, item]) => (
+                        <div key={key}>
+                          <span className={`status-dot ${item.status}`} />
+                          <strong>{formatLabel(key)}</strong>
+                          <em className={item.status}>{formatLabel(item.status)} · {formatDateTime(item.verifiedAt || item.completedAt || null)}</em>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4>Bureau Scores</h4>
+                    {selectedUserDetail.bureauScores.length ? (
+                      <div className="user-score-grid">
+                        {selectedUserDetail.bureauScores.map((score, index) => (
+                          <article key={`${score.bureau || score.name || "score"}-${index}`}>
+                            <span>{formatLabel(score.bureau || score.name || "Bureau")}</span>
+                            <strong>{score.creditScore ?? score.score ?? "-"}</strong>
+                            <em>{[score.reportType ? formatLabel(score.reportType) : "", score.providerMessage || score.status || "", formatDateTime(score.syncedAt || score.lastSyncedAt || null)].filter(Boolean).join(" · ")}</em>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="user-detail-empty">No bureau scores found</p>
+                    )}
+                  </section>
+
+                  <section>
+                    <h4>Recent Activity</h4>
+                    {selectedUserDetail.recentActivity.length ? (
+                      <div className="user-activity-list">
+                        {selectedUserDetail.recentActivity.map((activity, index) => (
+                          <div key={`${activity.type}-${index}`}>
+                            <strong>{activity.label || formatLabel(activity.type)}{activity.amount != null ? ` · ${activity.currency || "INR"} ${Number(activity.amount).toLocaleString("en-IN")}` : ""}</strong>
+                            <span>{formatDateTime(activity.occurredAt)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="user-detail-empty">No recent activity found</p>
+                    )}
+                  </section>
+                </>
+              ) : null}
+            </aside>
+          </div>
+        ) : null}
         {selectedSubscriptionUser ? (
           <div className="modal-backdrop">
             <section className="plan-modal">
@@ -8947,118 +9177,119 @@ export default function Home() {
 
   return (
     <main className="auth-page">
-      <div className="auth-logo">
-        <img src="/scorecare-logo.PNG" alt="ScoreCare" />
-      </div>
-      {step === "mobile" ? (
-        <form className="auth-box" onSubmit={submitMobile}>
+      <section className="auth-card">
+        <aside className="auth-visual">
           <div className="auth-brand">
             <img src="/scorecare-logo.PNG" alt="ScoreCare" />
+            <span>Score care</span>
           </div>
-          <div className="auth-header">
-            <h1>Admin Login</h1>
-            <p>Enter your registered mobile number</p>
+          <div className="auth-illustration" aria-hidden="true">
+            <img src="/admin-login-illustration.svg" alt="" />
           </div>
-          <label htmlFor="mobile">Mobile Number</label>
-          <div className="auth-field">
-            <span className="country-code">
-              <span className="india-flag" aria-hidden="true">
-                <span />
-              </span>
-              +91
-            </span>
-            <input
-              id="mobile"
-              required
-              inputMode="numeric"
-              maxLength={10}
-              minLength={10}
-              placeholder="Mobile number"
-              value={mobile}
-              onChange={(event) => setMobile(event.target.value.replace(/\D/g, ""))}
-            />
-          </div>
-          {error ? <p className="auth-error">{error}</p> : null}
-          <button disabled={isLoading} type="submit">
-            {isLoading ? "Sending OTP..." : "Next"}
-          </button>
-        </form>
-      ) : step === "otp" ? (
-        <form className="auth-box" onSubmit={submitOtp}>
-          <button className="auth-back" type="button" onClick={goBackToMobile} aria-label="Back to mobile number">
-            ‹
-          </button>
-          <div className="auth-brand">
-            <img src="/scorecare-logo.PNG" alt="ScoreCare" />
-          </div>
-          <div className="auth-header">
-            <h1>Enter OTP</h1>
-            <p>Verification code sent to {mobile}</p>
-          </div>
-          <label htmlFor="otp-0">OTP</label>
-          <div className="otp-fields">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <input
-                key={index}
-                id={index === 0 ? "otp-0" : undefined}
-                ref={(element) => {
-                  otpInputRefs.current[index] = element;
-                }}
-                required
-                inputMode="numeric"
-                maxLength={1}
-                value={otp[index] || ""}
-                onChange={(event) => updateOtpAtIndex(index, event.target.value)}
-                onKeyDown={(event) => handleOtpKeyDown(index, event)}
-                onPaste={handleOtpPaste}
-              />
-            ))}
-          </div>
-          {error ? <p className="auth-error">{error}</p> : null}
-          <button disabled={isLoading} type="submit">
-            {isLoading ? "Verifying..." : "Submit"}
-          </button>
-          <button className="auth-resend" disabled={isLoading || resendSeconds > 0} type="button" onClick={resendOtp}>
-            Resend OTP {resendSeconds > 0 ? `00:${String(resendSeconds).padStart(2, "0")}` : ""}
-          </button>
-        </form>
-      ) : (
-        <form className="auth-box" onSubmit={submitAuthenticator}>
-          <button className="auth-back" type="button" onClick={goBackToMobile} aria-label="Back to mobile number">
-            ‹
-          </button>
-          <div className="auth-brand">
-            <img src="/scorecare-logo.PNG" alt="ScoreCare" />
-          </div>
-          <div className="auth-header">
-            <h1>Google Authenticator</h1>
-            <p>{authenticatorSetup ? "Scan this QR, then enter the 6 digit code" : "Enter the 6 digit code from your authenticator app"}</p>
-          </div>
-          {authenticatorSetup ? (
-            <div className="authenticator-setup">
-              <QRCodeSVG className="authenticator-qr" value={authenticatorSetup.otpauthUrl} size={180} />
-              <p className="authenticator-secret">{authenticatorSetup.secret}</p>
-            </div>
-          ) : null}
-          <label htmlFor="authenticator-code">Authenticator Code</label>
-          <div className="auth-field">
-            <input
-              id="authenticator-code"
-              required
-              inputMode="numeric"
-              maxLength={6}
-              minLength={6}
-              placeholder="123456"
-              value={authenticatorCode}
-              onChange={(event) => setAuthenticatorCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-            />
-          </div>
-          {error ? <p className="auth-error">{error}</p> : null}
-          <button disabled={isLoading || authenticatorCode.length !== 6} type="submit">
-            {isLoading ? "Verifying..." : "Verify"}
-          </button>
-        </form>
-      )}
+        </aside>
+        <section className="auth-panel">
+          {step === "mobile" ? (
+            <form className="auth-box" onSubmit={submitMobile}>
+              <div className="auth-header">
+                <h1>Welcome to ScoreCare Admin</h1>
+                <p>Your Admin Dashboard</p>
+              </div>
+              <label htmlFor="mobile">Mobile Number</label>
+              <div className="auth-field">
+                <span className="country-code">
+                  <span className="india-flag" aria-hidden="true">
+                    <span />
+                  </span>
+                  +91
+                </span>
+                <input
+                  id="mobile"
+                  required
+                  inputMode="numeric"
+                  maxLength={10}
+                  minLength={10}
+                  placeholder="Mobile number"
+                  value={mobile}
+                  onChange={(event) => setMobile(event.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+              {error ? <p className="auth-error">{error}</p> : null}
+              <button disabled={isLoading} type="submit">
+                {isLoading ? "Sending OTP..." : "Next"}
+              </button>
+            </form>
+          ) : step === "otp" ? (
+            <form className="auth-box" onSubmit={submitOtp}>
+              <button className="auth-back" type="button" onClick={goBackToMobile} aria-label="Back to mobile number">
+                ‹
+              </button>
+              <div className="auth-header">
+                <h1>Enter OTP</h1>
+                <p>Verification code sent to {mobile}</p>
+              </div>
+              <label htmlFor="otp-0">OTP</label>
+              <div className="otp-fields">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <input
+                    key={index}
+                    id={index === 0 ? "otp-0" : undefined}
+                    ref={(element) => {
+                      otpInputRefs.current[index] = element;
+                    }}
+                    required
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={otp[index] || ""}
+                    onChange={(event) => updateOtpAtIndex(index, event.target.value)}
+                    onKeyDown={(event) => handleOtpKeyDown(index, event)}
+                    onPaste={handleOtpPaste}
+                  />
+                ))}
+              </div>
+              {error ? <p className="auth-error">{error}</p> : null}
+              <button disabled={isLoading} type="submit">
+                {isLoading ? "Verifying..." : "Submit"}
+              </button>
+              <button className="auth-resend" disabled={isLoading || resendSeconds > 0} type="button" onClick={resendOtp}>
+                Resend OTP {resendSeconds > 0 ? `00:${String(resendSeconds).padStart(2, "0")}` : ""}
+              </button>
+            </form>
+          ) : (
+            <form className="auth-box" onSubmit={submitAuthenticator}>
+              <button className="auth-back" type="button" onClick={goBackToMobile} aria-label="Back to mobile number">
+                ‹
+              </button>
+              <div className="auth-header">
+                <h1>Authenticator</h1>
+                <p>{authenticatorSetup ? "Scan this QR, then enter the 6 digit code" : "Enter the 6 digit code from your authenticator app"}</p>
+              </div>
+              {authenticatorSetup ? (
+                <div className="authenticator-setup">
+                  <QRCodeSVG className="authenticator-qr" value={authenticatorSetup.otpauthUrl} size={180} />
+                  <p className="authenticator-secret">{authenticatorSetup.secret}</p>
+                </div>
+              ) : null}
+              <label htmlFor="authenticator-code">Authenticator Code</label>
+              <div className="auth-field">
+                <input
+                  id="authenticator-code"
+                  required
+                  inputMode="numeric"
+                  maxLength={6}
+                  minLength={6}
+                  placeholder="123456"
+                  value={authenticatorCode}
+                  onChange={(event) => setAuthenticatorCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                />
+              </div>
+              {error ? <p className="auth-error">{error}</p> : null}
+              <button disabled={isLoading || authenticatorCode.length !== 6} type="submit">
+                {isLoading ? "Verifying..." : "Verify"}
+              </button>
+            </form>
+          )}
+        </section>
+      </section>
     </main>
   );
 }
@@ -9068,12 +9299,14 @@ function CommonTable({
   rows,
   emptyText,
   isLoading,
+  onRowClick,
   pagination,
 }: {
   columns: ReactNode[];
   rows: Array<Array<ReactNode>>;
   emptyText: string;
   isLoading?: boolean;
+  onRowClick?: (rowIndex: number) => void;
   pagination?: {
     page: number;
     totalPages: number;
@@ -9100,7 +9333,7 @@ function CommonTable({
             </tr>
           ) : rows.length ? (
             rows.map((row, rowIndex) => (
-              <tr key={rowIndex}>
+              <tr className={onRowClick ? "clickable-row" : ""} key={rowIndex} onClick={onRowClick ? () => onRowClick(rowIndex) : undefined}>
                 {row.map((cell, cellIndex) => (
                   <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
                 ))}
