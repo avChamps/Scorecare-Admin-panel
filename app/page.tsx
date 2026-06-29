@@ -5808,16 +5808,19 @@ export default function Home() {
     const chartColors = {
       axis: "#a7b2c3",
       grid: "#314154",
-      blue: "#4f8cff",
-      teal: "#22d3c5",
-      amber: "#fbbf24",
-      red: "#fb7185",
-      violet: "#a78bfa",
+      blue: "#5b9dff",
+      teal: "#2dd4bf",
+      amber: "#facc15",
       green: "#34d399",
-      mutedBlue: "#8db5ff",
     };
-    const pieColors = [chartColors.blue, chartColors.teal, chartColors.amber, chartColors.red, chartColors.violet, chartColors.green];
-    const subscriptionColors = [chartColors.green, chartColors.blue, chartColors.amber, chartColors.red];
+    const chartGradients = [
+      { start: "#7bb2ff", end: "#2563eb" },
+      { start: "#5eead4", end: "#0f9f8f" },
+      { start: "#fde68a", end: "#f59e0b" },
+      { start: "#fda4af", end: "#e11d48" },
+      { start: "#c4b5fd", end: "#7c3aed" },
+      { start: "#86efac", end: "#16a34a" },
+    ];
     const revenueBreakdown = dashboardCounts?.revenue
       ? [{
         name: "Revenue",
@@ -8793,15 +8796,26 @@ export default function Home() {
                       </div>
                     </header>
                     {accessTypeGraph.length ? (
-                      <ResponsiveContainer height={220} width="100%">
+                      <ResponsiveContainer height={270} width="100%">
                         <PieChart>
-                          <Pie animationDuration={800} data={accessTypeGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105} paddingAngle={3}>
+                          <defs>
+                            <filter height="140%" id="chartDropShadow" width="140%" x="-20%" y="-20%">
+                              <feDropShadow dx="0" dy="8" floodColor="#000000" floodOpacity="0.28" stdDeviation="5" />
+                            </filter>
+                            {chartGradients.map((gradient, index) => (
+                              <linearGradient id={`accessGradient${index}`} key={`accessGradient${index}`} x1="0" x2="1" y1="0" y2="1">
+                                <stop offset="0%" stopColor={gradient.start} />
+                                <stop offset="100%" stopColor={gradient.end} />
+                              </linearGradient>
+                            ))}
+                          </defs>
+                          <Pie animationDuration={800} cx="50%" cy="43%" data={accessTypeGraph} dataKey="count" endAngle={360} filter="url(#chartDropShadow)" innerRadius={56} nameKey="label" outerRadius={88} startAngle={0} stroke="#e6eefb" strokeWidth={1.5}>
                             {accessTypeGraph.map((entry, index) => (
-                              <Cell fill={pieColors[index % pieColors.length]} key={entry.label} />
+                              <Cell fill={`url(#accessGradient${index % chartGradients.length})`} key={entry.label} />
                             ))}
                           </Pie>
                           <Tooltip content={dashboardTooltip} />
-                          <Legend />
+                          <Legend align="center" height={34} verticalAlign="bottom" />
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
@@ -8817,15 +8831,26 @@ export default function Home() {
                       </div>
                     </header>
                     {subscriptionStatusGraph.length ? (
-                      <ResponsiveContainer height={220} width="100%">
+                      <ResponsiveContainer height={270} width="100%">
                         <PieChart>
-                          <Pie animationDuration={800} data={subscriptionStatusGraph} dataKey="count" innerRadius={72} nameKey="label" outerRadius={108} paddingAngle={4}>
+                          <defs>
+                            <filter height="140%" id="subscriptionDropShadow" width="140%" x="-20%" y="-20%">
+                              <feDropShadow dx="0" dy="8" floodColor="#000000" floodOpacity="0.28" stdDeviation="5" />
+                            </filter>
+                            {chartGradients.map((gradient, index) => (
+                              <linearGradient id={`subscriptionGradient${index}`} key={`subscriptionGradient${index}`} x1="0" x2="1" y1="0" y2="1">
+                                <stop offset="0%" stopColor={gradient.start} />
+                                <stop offset="100%" stopColor={gradient.end} />
+                              </linearGradient>
+                            ))}
+                          </defs>
+                          <Pie animationDuration={800} cx="50%" cy="43%" data={subscriptionStatusGraph} dataKey="count" endAngle={360} filter="url(#subscriptionDropShadow)" innerRadius={56} nameKey="label" outerRadius={88} startAngle={0} stroke="#e6eefb" strokeWidth={1.5}>
                             {subscriptionStatusGraph.map((entry, index) => (
-                              <Cell fill={subscriptionColors[index % subscriptionColors.length]} key={entry.label} />
+                              <Cell fill={`url(#subscriptionGradient${index % chartGradients.length})`} key={entry.label} />
                             ))}
                           </Pie>
                           <Tooltip content={dashboardTooltip} />
-                          <Legend />
+                          <Legend align="center" height={34} verticalAlign="bottom" />
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
@@ -8843,13 +8868,26 @@ export default function Home() {
                     {revenueBreakdown.length ? (
                       <ResponsiveContainer height={250} width="100%">
                         <BarChart data={revenueBreakdown}>
+                          <defs>
+                            <linearGradient id="subscriptionRevenueGradient" x1="0" x2="0" y1="0" y2="1">
+                              <stop offset="0%" stopColor="#7bb2ff" />
+                              <stop offset="100%" stopColor="#2563eb" />
+                            </linearGradient>
+                            <linearGradient id="repairRevenueGradient" x1="0" x2="0" y1="0" y2="1">
+                              <stop offset="0%" stopColor="#5eead4" />
+                              <stop offset="100%" stopColor="#0f9f8f" />
+                            </linearGradient>
+                            <filter height="140%" id="barDropShadow" width="140%" x="-20%" y="-20%">
+                              <feDropShadow dx="0" dy="7" floodColor="#000000" floodOpacity="0.22" stdDeviation="4" />
+                            </filter>
+                          </defs>
                           <CartesianGrid stroke={chartColors.grid} vertical={false} />
                           <XAxis dataKey="name" stroke={chartColors.axis} />
                           <YAxis stroke={chartColors.axis} tickFormatter={(value) => `₹${value}`} />
                           <Tooltip content={dashboardTooltip} />
                           <Legend />
-                          <Bar animationDuration={800} dataKey="subscriptionRevenue" fill={chartColors.blue} name="Subscription Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
-                          <Bar animationDuration={800} dataKey="cibilRepairRevenue" fill={chartColors.teal} name="CIBIL Repair Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
+                          <Bar animationDuration={800} dataKey="subscriptionRevenue" fill="url(#subscriptionRevenueGradient)" filter="url(#barDropShadow)" name="Subscription Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
+                          <Bar animationDuration={800} dataKey="cibilRepairRevenue" fill="url(#repairRevenueGradient)" filter="url(#barDropShadow)" name="CIBIL Repair Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
@@ -8867,13 +8905,19 @@ export default function Home() {
                     {hasFeedbackData ? (
                       <ResponsiveContainer height={240} width="100%">
                         <BarChart data={feedbackBars} layout="vertical">
+                          <defs>
+                            <linearGradient id="feedbackGradient" x1="0" x2="1" y1="0" y2="0">
+                              <stop offset="0%" stopColor="#7bb2ff" />
+                              <stop offset="100%" stopColor="#34d399" />
+                            </linearGradient>
+                          </defs>
                           <CartesianGrid stroke={chartColors.grid} horizontal={false} />
                           <XAxis stroke={chartColors.axis} type="number" />
                           <YAxis dataKey="rating" stroke={chartColors.axis} type="category" width={70} />
                           <Tooltip content={dashboardTooltip} />
                           <Bar animationDuration={800} dataKey="count" name="Ratings" radius={[0, 8, 8, 0]}>
                             {feedbackBars.map((entry) => (
-                              <Cell fill={entry.rating.startsWith("5") ? chartColors.green : chartColors.mutedBlue} key={entry.rating} />
+                              <Cell fill={entry.rating.startsWith("5") ? chartColors.green : "url(#feedbackGradient)"} key={entry.rating} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -8891,15 +8935,26 @@ export default function Home() {
                       </div>
                     </header>
                     {repairStatusGraph.length ? (
-                      <ResponsiveContainer height={220} width="100%">
+                      <ResponsiveContainer height={270} width="100%">
                         <PieChart>
-                          <Pie data={repairStatusGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105}>
+                          <defs>
+                            <filter height="140%" id="repairDropShadow" width="140%" x="-20%" y="-20%">
+                              <feDropShadow dx="0" dy="8" floodColor="#000000" floodOpacity="0.28" stdDeviation="5" />
+                            </filter>
+                            {chartGradients.map((gradient, index) => (
+                              <linearGradient id={`repairGradient${index}`} key={`repairGradient${index}`} x1="0" x2="1" y1="0" y2="1">
+                                <stop offset="0%" stopColor={gradient.start} />
+                                <stop offset="100%" stopColor={gradient.end} />
+                              </linearGradient>
+                            ))}
+                          </defs>
+                          <Pie cx="50%" cy="43%" data={repairStatusGraph} dataKey="count" endAngle={360} filter="url(#repairDropShadow)" innerRadius={56} nameKey="label" outerRadius={88} startAngle={0} stroke="#e6eefb" strokeWidth={1.5}>
                             {repairStatusGraph.map((entry, index) => (
-                              <Cell fill={pieColors[index % pieColors.length]} key={entry.label} />
+                              <Cell fill={`url(#repairGradient${index % chartGradients.length})`} key={entry.label} />
                             ))}
                           </Pie>
                           <Tooltip content={dashboardTooltip} />
-                          <Legend />
+                          <Legend align="center" height={34} verticalAlign="bottom" />
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
@@ -8915,15 +8970,26 @@ export default function Home() {
                       </div>
                     </header>
                     {disputesStatusGraph.length ? (
-                      <ResponsiveContainer height={220} width="100%">
+                      <ResponsiveContainer height={270} width="100%">
                         <PieChart>
-                          <Pie data={disputesStatusGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105}>
+                          <defs>
+                            <filter height="140%" id="disputesDropShadow" width="140%" x="-20%" y="-20%">
+                              <feDropShadow dx="0" dy="8" floodColor="#000000" floodOpacity="0.28" stdDeviation="5" />
+                            </filter>
+                            {chartGradients.map((gradient, index) => (
+                              <linearGradient id={`disputesGradient${index}`} key={`disputesGradient${index}`} x1="0" x2="1" y1="0" y2="1">
+                                <stop offset="0%" stopColor={gradient.start} />
+                                <stop offset="100%" stopColor={gradient.end} />
+                              </linearGradient>
+                            ))}
+                          </defs>
+                          <Pie cx="50%" cy="43%" data={disputesStatusGraph} dataKey="count" endAngle={360} filter="url(#disputesDropShadow)" innerRadius={56} nameKey="label" outerRadius={88} startAngle={0} stroke="#e6eefb" strokeWidth={1.5}>
                             {disputesStatusGraph.map((entry, index) => (
-                              <Cell fill={pieColors[index % pieColors.length]} key={entry.label} />
+                              <Cell fill={`url(#disputesGradient${index % chartGradients.length})`} key={entry.label} />
                             ))}
                           </Pie>
                           <Tooltip content={dashboardTooltip} />
-                          <Legend />
+                          <Legend align="center" height={34} verticalAlign="bottom" />
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
