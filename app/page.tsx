@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardEvent, FormEvent, Fragment, KeyboardEvent, UIEvent, useEffect, useRef, useState } from "react";
+import { ClipboardEvent, FormEvent, KeyboardEvent, UIEvent, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
@@ -21,7 +21,6 @@ import {
 } from "recharts";
 import { API_BASE_URL } from "./api/api";
 
-const menuItems = ["Dashboard", /* "Loans", */ "Chats", "Feedback", "Contact Us", "API Logs"];
 const menuIcons: Record<string, ReactNode> = {
   Dashboard: (
     <svg viewBox="0 0 24 24">
@@ -160,7 +159,7 @@ const loanTypeOptions = [
   { label: "Loan Against Property", value: "loan_against_property" },
 ];
 const loanStatusOptions = ["submitted", "in_review", "approved", "rejected"];
-const creditRepairStatusOptions = ["upload_document", "submitted", "analysis", "in_progress", "resolved", "closed", "cancelled"];
+const creditRepairStatusOptions = ["upload_document", "submitted", "under_review", "analysis", "in_progress", "resolved", "closed", "cancelled"];
 const disputeStatusOptions = ["submitted", "under_review", "resolved", "rejected", "closed", "cancelled"];
 const emptyAdminPlanForm: AdminPlanForm = {
   publicId: "",
@@ -342,8 +341,8 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   Notifications: { menuName: "General", childMenuName: "Notifications" },
   "Plans & Benefits": { menuName: "Plans & Benefits", childMenuName: "Repair service" },
   "Basic Plan": { menuName: "Plans & Benefits", childMenuName: "Basic plan" },
-  "Credit Repair": { menuName: "Services", childMenuName: "Credit Repair" },
-  Disputes: { menuName: "Services", childMenuName: "Disputes" },
+  "Credit Repair": { menuName: "Credit Repair", childMenuName: "Repair Requests" },
+  Disputes: { menuName: "Disputes", childMenuName: null },
   "Basic Subscription": { menuName: "Revenue", childMenuName: "Basic Subscription" },
   "Repair Service Subscription": { menuName: "Revenue", childMenuName: "Repair Service Subscription" },
   Users: { menuName: "User management", childMenuName: "Users" },
@@ -944,16 +943,32 @@ type CreditRepairRequest = {
   pointsGained: number;
   progressItems: unknown[];
   remarks?: string | null;
+  bureau?: string | null;
+  assignedEmployee?: {
+    publicId: string;
+    fullName: string;
+  } | null;
+  timeline?: Array<{
+    id: number | string;
+    title?: string | null;
+    description?: string | null;
+    actorName?: string | null;
+    createdAt?: string | null;
+  }>;
   accounts: Array<{
+    id?: number | string;
     issueType: string;
     accountType: string;
     accountNumber: string;
     subscriberName: string;
+    disputeStatus?: string | null;
+    documents?: Record<string, string> | null;
   }>;
   documents?: Array<{
     id: number | string;
     documentType?: string | null;
     documentUrl?: string | null;
+    fileSize?: string | null;
     accountNumber?: string | null;
     accountType?: string | null;
     closingDate?: string | null;
@@ -1359,7 +1374,18 @@ export default function Home() {
   const [selectedCreditRepair, setSelectedCreditRepair] = useState<CreditRepairRequest | null>(null);
   const [creditRepairStatus, setCreditRepairStatus] = useState("submitted");
   const [creditRepairRemarks, setCreditRepairRemarks] = useState("");
+  const [creditRepairEmployeeId, setCreditRepairEmployeeId] = useState("");
+  const [creditRepairUploadAccountNumber, setCreditRepairUploadAccountNumber] = useState("");
+  const [creditRepairUploadFile, setCreditRepairUploadFile] = useState<File | null>(null);
+  const [creditRepairWhatsappNotify, setCreditRepairWhatsappNotify] = useState(true);
+  const [creditRepairEmailNotify, setCreditRepairEmailNotify] = useState(true);
+  const [creditRepairWhatsappMessage, setCreditRepairWhatsappMessage] = useState("Your credit repair case status has been updated.");
+  const [isCreditRepairDetailLoading, setIsCreditRepairDetailLoading] = useState(false);
   const [isUpdatingCreditRepair, setIsUpdatingCreditRepair] = useState(false);
+  const [isAssigningCreditRepair, setIsAssigningCreditRepair] = useState(false);
+  const [isUploadingCreditRepairDocument, setIsUploadingCreditRepairDocument] = useState(false);
+  const [filingCreditRepairAccountId, setFilingCreditRepairAccountId] = useState<string | number | null>(null);
+  const [isSendingCreditRepairWhatsapp, setIsSendingCreditRepairWhatsapp] = useState(false);
   const [disputesData, setDisputesData] = useState<DisputesResponse | null>(null);
   const [disputesError, setDisputesError] = useState("");
   const [isDisputesLoading, setIsDisputesLoading] = useState(false);
@@ -1641,10 +1667,6 @@ export default function Home() {
   }
 
   function hasViewPermission(view: AppView, accessList = userMenuAccess) {
-    if (view === "Notifications") {
-      return true;
-    }
-
     const hasReadAccess = (permissions: string[]) =>
       permissions.some((permission) => ["view", "read"].includes(permission.toLowerCase()));
 
@@ -4094,9 +4116,43 @@ export default function Home() {
     setSelectedCreditRepair(request);
     setCreditRepairStatus(request.repairStatus || "submitted");
     setCreditRepairRemarks(request.remarks || "");
+    setCreditRepairEmployeeId(request.assignedEmployee?.publicId || "");
+    setCreditRepairUploadAccountNumber(request.accounts?.[0]?.accountNumber || "");
+    setCreditRepairUploadFile(null);
+    if (adminUser?.token && !employeesData && !isEmployeesLoading) {
+      loadEmployees();
+    }
+    loadCreditRepairDetail(request.publicId);
   }
 
-  async function updateCreditRepairRequest() {
+  async function loadCreditRepairDetail(publicId: string) {
+    if (!adminUser?.token) return;
+
+    try {
+      setIsCreditRepairDetailLoading(true);
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests/${publicId}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load credit repair request");
+      }
+
+      const request = result.data;
+      setSelectedCreditRepair(request);
+      setCreditRepairStatus(request.repairStatus || "submitted");
+      setCreditRepairRemarks(request.remarks || "");
+      setCreditRepairEmployeeId(request.assignedEmployee?.publicId || "");
+      setCreditRepairUploadAccountNumber(request.accounts?.[0]?.accountNumber || "");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to load credit repair request");
+    } finally {
+      setIsCreditRepairDetailLoading(false);
+    }
+  }
+
+  async function updateCreditRepairRequest(nextStatus = creditRepairStatus, closeAfterUpdate = true) {
     if (!selectedCreditRepair || !adminUser?.token) return;
 
     try {
@@ -4107,7 +4163,7 @@ export default function Home() {
           Authorization: `Bearer ${adminUser.token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ repairStatus: creditRepairStatus, remarks: creditRepairRemarks }),
+        body: JSON.stringify({ repairStatus: nextStatus, remarks: creditRepairRemarks }),
       });
       const result = await response.json();
 
@@ -4115,13 +4171,134 @@ export default function Home() {
         throw new Error(result.message || "Unable to update credit repair request");
       }
 
-      setSelectedCreditRepair(null);
+      if (closeAfterUpdate) {
+        setSelectedCreditRepair(null);
+      } else {
+        await loadCreditRepairDetail(selectedCreditRepair.publicId);
+      }
       showToast("success", "Credit repair request updated successfully");
       await loadCreditRepairRequests(creditRepairData?.pagination?.page || 1);
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to update credit repair request");
     } finally {
       setIsUpdatingCreditRepair(false);
+    }
+  }
+
+  async function assignCreditRepairEmployee() {
+    if (!selectedCreditRepair || !adminUser?.token || !adminUser.isAdmin || !creditRepairEmployeeId) return;
+
+    try {
+      setIsAssigningCreditRepair(true);
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests/${selectedCreditRepair.publicId}/assign`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ employeePublicId: creditRepairEmployeeId, notifyUser: creditRepairWhatsappNotify || creditRepairEmailNotify }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to assign employee");
+      }
+
+      showToast("success", result.message || "Employee assigned successfully");
+      await loadCreditRepairDetail(selectedCreditRepair.publicId);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to assign employee");
+    } finally {
+      setIsAssigningCreditRepair(false);
+    }
+  }
+
+  async function uploadCreditRepairDocument() {
+    if (!selectedCreditRepair || !adminUser?.token || !creditRepairUploadFile || !creditRepairUploadAccountNumber) return;
+
+    try {
+      setIsUploadingCreditRepairDocument(true);
+      const formData = new FormData();
+      formData.append("documentType", "additional_document");
+      formData.append("accountNumber", creditRepairUploadAccountNumber);
+      formData.append("document", creditRepairUploadFile);
+
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests/${selectedCreditRepair.publicId}/documents`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to upload document");
+      }
+
+      setCreditRepairUploadFile(null);
+      showToast("success", result.message || "Document uploaded successfully");
+      await loadCreditRepairDetail(selectedCreditRepair.publicId);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to upload document");
+    } finally {
+      setIsUploadingCreditRepairDocument(false);
+    }
+  }
+
+  async function fileCreditRepairDispute(account: CreditRepairRequest["accounts"][number]) {
+    if (!selectedCreditRepair || !adminUser?.token || !account.id) return;
+
+    try {
+      setFilingCreditRepairAccountId(account.id);
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests/${selectedCreditRepair.publicId}/accounts/${account.id}/dispute`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          remarks: creditRepairRemarks || "Filing dispute for overdue balance verification",
+          notifyUser: creditRepairWhatsappNotify || creditRepairEmailNotify,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to file dispute");
+      }
+
+      showToast("success", result.message || "Dispute filed successfully");
+      await loadCreditRepairDetail(selectedCreditRepair.publicId);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to file dispute");
+    } finally {
+      setFilingCreditRepairAccountId(null);
+    }
+  }
+
+  async function sendCreditRepairWhatsapp() {
+    if (!selectedCreditRepair || !adminUser?.token || !adminUser.isAdmin || !creditRepairWhatsappMessage.trim()) return;
+
+    try {
+      setIsSendingCreditRepairWhatsapp(true);
+      const response = await fetch(`${API_BASE_URL}/admin/cibil-repair-requests/${selectedCreditRepair.publicId}/notify/whatsapp`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: creditRepairWhatsappMessage.trim() }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to send WhatsApp notification");
+      }
+
+      showToast("success", result.message || "WhatsApp notification sent successfully");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to send WhatsApp notification");
+    } finally {
+      setIsSendingCreditRepairWhatsapp(false);
     }
   }
 
@@ -5281,6 +5458,7 @@ export default function Home() {
     const canDeletePlans = hasActionPermission("Plans & Benefits", "delete");
     const canUpdateBasicPlan = hasActionPermission("Basic Plan", "update");
     const canUpdateCreditRepair = hasActionPermission("Credit Repair", "update");
+    const canManageCreditRepairAdminFields = Boolean(adminUser?.isAdmin);
     const canUpdateDisputes = hasActionPermission("Disputes", "update");
     const canCreateManualReport = hasActionPermission("Manual Report", "create");
     const canExportUsers = hasActionPermission("Users", "export");
@@ -5598,6 +5776,7 @@ export default function Home() {
       "Amount",
       "Payment Status",
       "Repair Status",
+      "Assigned To",
       "Accounts",
       "Documents",
       "Remarks",
@@ -5608,53 +5787,59 @@ export default function Home() {
       "Points Gained",
       ...(canUpdateCreditRepair ? ["Action"] : []),
     ];
-    const creditRepairRows = creditRepairData?.requests.map((request) => [
-      request.userName || "-",
-      request.mobileNumber || "-",
-      request.email || "-",
-      request.planName || "-",
-      `${request.currency || "INR"} ${Number(request.amount || 0).toLocaleString("en-IN")}`,
-      formatLabel(request.paymentStatus),
-      formatLabel(request.repairStatus),
-      request.accounts?.length ? (
-        <div className="credit-repair-accounts">
-          {request.accounts.map((account, index) => (
-            <span key={`${account.accountNumber}-${index}`}>
-              <strong>{account.subscriberName}</strong>
-              {account.accountType} · {account.accountNumber} · {account.issueType}
-            </span>
-          ))}
-        </div>
-      ) : "-",
-      request.documents?.length ? (
-        <div className="dispute-documents">
-          {request.documents.map((document, index) => (
-            document.documentUrl ? (
+    const creditRepairRows = creditRepairData?.requests.map((request) => {
+      const documents = (request.documents || []).map((document) => ({
+        documentType: document.documentType || "document",
+        documentUrl: document.documentUrl || "",
+      })).filter((document) => document.documentUrl);
+
+      return [
+        request.userName || "-",
+        request.mobileNumber || "-",
+        request.email || "-",
+        request.planName || "-",
+        `${request.currency || "INR"} ${Number(request.amount || 0).toLocaleString("en-IN")}`,
+        formatLabel(request.paymentStatus),
+        formatLabel(request.repairStatus),
+        request.assignedEmployee?.fullName || "-",
+        request.accounts?.length ? (
+          <div className="credit-repair-accounts">
+            {request.accounts.map((account, index) => (
+              <span key={`${account.accountNumber}-${index}`}>
+                <strong>{account.subscriberName || "-"}</strong>
+                {account.accountType || "-"} · {account.accountNumber || "-"} · {account.issueType || "-"}
+              </span>
+            ))}
+          </div>
+        ) : "-",
+        documents.length ? (
+          <div className="dispute-documents">
+            {documents.map((document, index) => (
               <a
                 className="table-action"
                 href={document.documentUrl}
-                key={document.id || `${document.documentUrl}-${index}`}
+                key={`${document.documentUrl}-${index}`}
                 rel="noreferrer"
                 target="_blank"
               >
                 {formatLabel(document.documentType || `Document ${index + 1}`)}
               </a>
-            ) : null
-          ))}
-        </div>
-      ) : "-",
-      request.remarks || "-",
-      formatDate(request.createdAt || null),
-      formatDate(request.updatedAt || null),
-      request.activeDisputes ?? 0,
-      request.resolvedDisputes ?? 0,
-      request.pointsGained ?? 0,
-      ...(canUpdateCreditRepair ? [
-        <button className="table-action" type="button" onClick={() => openCreditRepairUpdate(request)}>
-          <ActionIcon type="edit" />Update
-        </button>,
-      ] : []),
-    ]) ?? [];
+            ))}
+          </div>
+        ) : "-",
+        request.remarks || "-",
+        formatDate(request.createdAt || null),
+        formatDate(request.updatedAt || null),
+        request.activeDisputes ?? 0,
+        request.resolvedDisputes ?? 0,
+        request.pointsGained ?? 0,
+        ...(canUpdateCreditRepair ? [
+          <button className="table-action" type="button" onClick={() => openCreditRepairUpdate(request)}>
+            <ActionIcon type="edit" />Update
+          </button>,
+        ] : []),
+      ];
+    }) ?? [];
     const disputeColumns = ["User", "Account", "Dispute", "Documents", "Status", "Progress", "Timeline", ...(canUpdateDisputes ? ["Action"] : [])];
     const disputeRows = disputesData?.disputes.map((dispute) => [
       <div className="dispute-table-cell">
@@ -5763,18 +5948,6 @@ export default function Home() {
             </button> */}
           </div>
           <nav>
-            {menuItems.filter((item) => hasViewPermission(item as AppView)).map((item) => (
-              <Fragment key={item}>
-                <button
-                  className={activeView === item ? "active" : ""}
-                  type="button"
-                  onClick={() => openAdminView(item as AppView)}
-                >
-                  <span className="menu-icon">{menuIcons[item]}</span>
-                  {item}
-                </button>
-                {item === "Dashboard" ? (
-                  <>
                     {["General", "Website Settings", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].some((view) => hasViewPermission(view as AppView)) ? (
                       <div className={`sidebar-group ${activeView === "General" || activeView === "Website Settings" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "FAQs" ? "active" : ""}`}>
                         <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
@@ -5913,10 +6086,6 @@ export default function Home() {
                         ) : null}
                       </div>
                     ) : null}
-                  </>
-                ) : null}
-              </Fragment>
-            ))}
           </nav>
         </aside>
         <section className="content">
@@ -8494,24 +8663,200 @@ export default function Home() {
         ) : null}
         {selectedCreditRepair ? (
           <div className="modal-backdrop">
-            <section className="plan-modal">
+            <section className="plan-modal credit-repair-modal">
               <header>
                 <div><h3>Update Credit Repair</h3><p>{selectedCreditRepair.userName || "Request"}</p></div>
                 <button type="button" onClick={() => setSelectedCreditRepair(null)}>×</button>
               </header>
-              <label className="amount-field">
-                Status
-                <select value={creditRepairStatus} onChange={(event) => setCreditRepairStatus(event.target.value)}>
-                  {creditRepairStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
-                </select>
-              </label>
-              <label className="amount-field">
-                Remarks
-                <textarea value={creditRepairRemarks} onChange={(event) => setCreditRepairRemarks(event.target.value)} />
-              </label>
+              <div className="credit-repair-drawer">
+                <div className="credit-repair-main">
+                  <div className="credit-repair-case-header">
+                    <div>
+                      <span>Case #{selectedCreditRepair.publicId || selectedCreditRepair.id}</span>
+                      <strong>{selectedCreditRepair.userName || "-"}</strong>
+                      <small>{selectedCreditRepair.mobileNumber || "-"} · {selectedCreditRepair.email || "-"} · Submitted {formatDate(selectedCreditRepair.createdAt || null)}</small>
+                      <div className="credit-repair-badges">
+                        <em className="success">{formatLabel(selectedCreditRepair.paymentStatus)} · {selectedCreditRepair.currency || "INR"} {Number(selectedCreditRepair.amount || 0).toLocaleString("en-IN")}</em>
+                        <em>{selectedCreditRepair.planName || "-"}</em>
+                        <em className="warning">{formatLabel(selectedCreditRepair.repairStatus)}</em>
+                        {isCreditRepairDetailLoading ? <em>Loading details...</em> : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="credit-repair-section-title">User details</div>
+                  <div className="credit-repair-info-grid">
+                    <span><small>Mobile</small><strong>{selectedCreditRepair.mobileNumber || "-"}</strong></span>
+                    <span><small>Email</small><strong>{selectedCreditRepair.email || "-"}</strong></span>
+                    <span><small>Plan</small><strong>{selectedCreditRepair.planName || "-"}</strong></span>
+                    <span><small>Amount paid</small><strong>{selectedCreditRepair.currency || "INR"} {Number(selectedCreditRepair.amount || 0).toLocaleString("en-IN")}</strong></span>
+                    <span><small>Payment status</small><strong>{formatLabel(selectedCreditRepair.paymentStatus)}</strong></span>
+                    <span><small>Bureau</small><strong>{selectedCreditRepair.bureau || "-"}</strong></span>
+                    <span><small>Updated</small><strong>{formatDate(selectedCreditRepair.updatedAt || null)}</strong></span>
+                  </div>
+
+                  <div className="credit-repair-section-title">Credit accounts with issues</div>
+                  <div className="credit-repair-account-list">
+                    {selectedCreditRepair.accounts?.length ? selectedCreditRepair.accounts.map((account, index) => (
+                      <div className="credit-repair-account-card" key={`${account.accountNumber}-${index}`}>
+                        <div>
+                          <strong>{account.subscriberName || "-"} · {account.accountType || "-"}</strong>
+                          <small>Acc: {account.accountNumber || "-"}</small>
+                        </div>
+                        <em>{formatLabel(account.issueType || "issue")}</em>
+                        <div className="credit-repair-dispute-row">
+                          <small>Dispute status:</small>
+                          <em>{formatLabel(account.disputeStatus || "not_filed")}</em>
+                          <button type="button" disabled={!account.id || filingCreditRepairAccountId === account.id} onClick={() => fileCreditRepairDispute(account)}>
+                            {filingCreditRepairAccountId === account.id ? "Filing..." : "File dispute"}
+                          </button>
+                        </div>
+                      </div>
+                    )) : <div className="credit-repair-empty">No account issues found</div>}
+                  </div>
+
+                  <div className="credit-repair-section-title">Uploaded documents</div>
+                  <div className="credit-repair-doc-list">
+                    {selectedCreditRepair.documents?.length ? selectedCreditRepair.documents.map((document, index) => (
+                      <div className="credit-repair-doc-item" key={document.id || `${document.documentUrl}-${index}`}>
+                        <span>PDF</span>
+                        <div>
+                          <strong>{formatLabel(document.documentType || `Document ${index + 1}`)}</strong>
+                          <small>{document.accountType || "Document"}{document.fileSize ? ` · ${document.fileSize}` : ""} · Uploaded {formatDate(document.createdAt || null)}</small>
+                        </div>
+                        {document.documentUrl ? (
+                          <a className="table-action" href={document.documentUrl} rel="noreferrer" target="_blank">View</a>
+                        ) : null}
+                      </div>
+                    )) : <div className="credit-repair-empty">No documents uploaded</div>}
+                    <div className="credit-repair-upload-box">
+                      <select value={creditRepairUploadAccountNumber} onChange={(event) => setCreditRepairUploadAccountNumber(event.target.value)}>
+                        <option value="">Select account</option>
+                        {selectedCreditRepair.accounts?.map((account, index) => (
+                          <option key={`${account.accountNumber}-${index}`} value={account.accountNumber}>{account.subscriberName || account.accountType || "Account"} · {account.accountNumber}</option>
+                        ))}
+                      </select>
+                      <input type="file" onChange={(event) => setCreditRepairUploadFile(event.target.files?.[0] || null)} />
+                      <button className="credit-repair-upload-row" type="button" disabled={isUploadingCreditRepairDocument || !creditRepairUploadFile || !creditRepairUploadAccountNumber} onClick={uploadCreditRepairDocument}>
+                        {isUploadingCreditRepairDocument ? "Uploading..." : "Upload additional document"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="credit-repair-section-title">Activity timeline</div>
+                  <div className="credit-repair-timeline">
+                    {selectedCreditRepair.timeline?.length ? selectedCreditRepair.timeline.map((item) => (
+                      <div key={item.id}>
+                        <span />
+                        <p><small>{formatDateTime(item.createdAt || null)}</small>{item.title || "Activity"}{item.description ? `: ${item.description}` : ""}<strong>{item.actorName || "System"}</strong></p>
+                      </div>
+                    )) : (
+                      <>
+                        <div>
+                          <span />
+                          <p><small>{formatDateTime(selectedCreditRepair.createdAt || null)}</small>Case created. Payment of {selectedCreditRepair.currency || "INR"} {Number(selectedCreditRepair.amount || 0).toLocaleString("en-IN")} confirmed.<strong>System</strong></p>
+                        </div>
+                        {selectedCreditRepair.accounts?.length ? (
+                          <div>
+                            <span />
+                            <p><small>{formatDateTime(selectedCreditRepair.createdAt || null)}</small>{selectedCreditRepair.accounts.length} account issue{selectedCreditRepair.accounts.length > 1 ? "s" : ""} found for review.<strong>System</strong></p>
+                          </div>
+                        ) : null}
+                        <div>
+                          <span />
+                          <p><small>{formatDateTime(selectedCreditRepair.updatedAt || selectedCreditRepair.createdAt || null)}</small>Case marked "{formatLabel(selectedCreditRepair.repairStatus)}".<strong>Admin</strong></p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="credit-repair-section-title">Internal notes</div>
+                  <label className="amount-field">
+                    Remarks
+                    <textarea value={creditRepairRemarks} onChange={(event) => setCreditRepairRemarks(event.target.value)} />
+                  </label>
+                  <button className="credit-repair-inline-action" disabled={isUpdatingCreditRepair} type="button" onClick={() => updateCreditRepairRequest(creditRepairStatus, false)}>
+                    Save note
+                  </button>
+                </div>
+
+                <aside className="credit-repair-side">
+                  <div className="credit-repair-side-section">
+                    <div className="credit-repair-side-title">Repair status</div>
+                    <div className="credit-repair-stepper">
+                      {creditRepairStatusOptions.map((status, index) => {
+                        const activeIndex = creditRepairStatusOptions.indexOf(creditRepairStatus);
+                        return (
+                          <div className="credit-repair-step" key={status}>
+                            <span className={index < activeIndex ? "done" : index === activeIndex ? "active" : ""}>{index < activeIndex ? "OK" : index + 1}</span>
+                            <div>
+                              <strong>{formatLabel(status)}</strong>
+                              <small>{index === activeIndex ? "In progress" : index < activeIndex ? "Completed" : "Pending"}</small>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="credit-repair-side-section">
+                    <div className="credit-repair-side-title">Assign employee</div>
+                    <label className="amount-field">
+                      Employee
+                      <select disabled={!canManageCreditRepairAdminFields} value={creditRepairEmployeeId} onChange={(event) => setCreditRepairEmployeeId(event.target.value)}>
+                        <option value="">-- Select employee --</option>
+                        {employeesData?.employees.map((employee) => (
+                          <option key={employee.publicId} value={employee.publicId}>{employee.fullName} ({formatLabel(employee.status)})</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button className="credit-repair-side-action" type="button" disabled={!canManageCreditRepairAdminFields || isAssigningCreditRepair || !creditRepairEmployeeId} onClick={assignCreditRepairEmployee}>
+                      {isAssigningCreditRepair ? "Assigning..." : "Assign & notify"}
+                    </button>
+                  </div>
+
+                  <div className="credit-repair-side-section">
+                    <div className="credit-repair-side-title">Update status</div>
+                    <label className="amount-field">
+                      Status
+                      <select value={creditRepairStatus} onChange={(event) => setCreditRepairStatus(event.target.value)}>
+                        {creditRepairStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                      </select>
+                    </label>
+                    <button className="credit-repair-side-action primary" disabled={isUpdatingCreditRepair} type="button" onClick={() => updateCreditRepairRequest()}>
+                      Update status
+                    </button>
+                  </div>
+
+                  <div className="credit-repair-side-section">
+                    <div className="credit-repair-side-title">Progress</div>
+                    <div className="credit-repair-stats">
+                      <span><small>Active disputes</small><strong>{selectedCreditRepair.activeDisputes ?? 0}</strong></span>
+                      <span><small>Resolved</small><strong>{selectedCreditRepair.resolvedDisputes ?? 0}</strong></span>
+                      <span><small>Points gained</small><strong>{selectedCreditRepair.pointsGained ?? 0}</strong></span>
+                    </div>
+                  </div>
+
+                  <div className="credit-repair-side-section">
+                    <div className="credit-repair-side-title">Notify user</div>
+                    <label className="credit-repair-toggle"><input type="checkbox" disabled={!canManageCreditRepairAdminFields} checked={creditRepairWhatsappNotify} onChange={(event) => setCreditRepairWhatsappNotify(event.target.checked)} /> WhatsApp on status change</label>
+                    <label className="credit-repair-toggle"><input type="checkbox" disabled={!canManageCreditRepairAdminFields} checked={creditRepairEmailNotify} onChange={(event) => setCreditRepairEmailNotify(event.target.checked)} /> Email on dispute update</label>
+                    <textarea className="credit-repair-message" disabled={!canManageCreditRepairAdminFields} value={creditRepairWhatsappMessage} onChange={(event) => setCreditRepairWhatsappMessage(event.target.value)} />
+                    <button className="credit-repair-side-action" type="button" disabled={!canManageCreditRepairAdminFields || isSendingCreditRepairWhatsapp || !creditRepairWhatsappMessage.trim()} onClick={sendCreditRepairWhatsapp}>
+                      {isSendingCreditRepairWhatsapp ? "Sending..." : "Send manual WhatsApp"}
+                    </button>
+                  </div>
+
+                  <div className="credit-repair-side-section">
+                    <div className="credit-repair-side-title">Case actions</div>
+                    <button className="credit-repair-side-action success" disabled={isUpdatingCreditRepair} type="button" onClick={() => updateCreditRepairRequest("resolved")}>Mark resolved</button>
+                    <button className="credit-repair-side-action danger" disabled={isUpdatingCreditRepair} type="button" onClick={() => updateCreditRepairRequest("cancelled")}>Reject & refund</button>
+                  </div>
+                </aside>
+              </div>
               <footer className="modal-actions">
                 <button type="button" onClick={() => setSelectedCreditRepair(null)}>Cancel</button>
-                <button disabled={isUpdatingCreditRepair} type="button" onClick={updateCreditRepairRequest}>{isUpdatingCreditRepair ? "Updating..." : "Submit"}</button>
+                <button disabled={isUpdatingCreditRepair} type="button" onClick={() => updateCreditRepairRequest()}>{isUpdatingCreditRepair ? "Updating..." : "Submit"}</button>
               </footer>
             </section>
           </div>
