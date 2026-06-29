@@ -89,16 +89,16 @@ select {
   align-items: center;
   color: #111827;
   display: flex;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 800;
-  gap: 12px;
+  gap: 14px;
 }
 
 .auth-brand img {
   display: block;
-  height: 40px;
+  height: 64px;
   object-fit: contain;
-  width: 40px;
+  width: 64px;
 }
 
 .auth-illustration {
@@ -5159,18 +5159,57 @@ select {
   }
 
   .topbar {
-    gap: 12px;
-    height: 54px;
-    padding: 0 12px;
+    align-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    height: auto;
+    min-height: 92px;
+    padding: 10px 12px;
   }
 
   .topbar button {
+    flex: 0 0 34px;
     height: 34px;
     width: 34px;
   }
 
+  .topbar-actions {
+    gap: 8px;
+    order: 1;
+  }
+
+  .topbar-profile {
+    flex: 0 1 auto;
+    gap: 8px;
+    margin-left: auto;
+    min-width: 0;
+    order: 2;
+  }
+
+  .topbar-announcement {
+    flex: 0 0 100%;
+    order: 3;
+  }
+
+  .topbar-announcement > div {
+    max-width: 100%;
+    padding: 7px 10px;
+  }
+
+  .current-time {
+    flex: 0 1 94px;
+    gap: 0;
+    min-width: 82px;
+    overflow: hidden;
+    padding: 8px;
+  }
+
   .current-time strong {
-    font-size: 12px;
+    display: block;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
   }
 
   .dashboard-body {
@@ -5202,10 +5241,14 @@ select {
   .analytics-hero {
     gap: 12px;
     min-height: 0;
+    overflow-wrap: anywhere;
   }
 
-  .analytics-hero strong {
+  .analytics-hero span {
     font-size: 26px;
+    line-height: 1.15;
+    margin-bottom: 12px;
+    overflow-wrap: anywhere;
   }
 
   .analytics-kpi-grid {
@@ -5214,7 +5257,7 @@ select {
 
   .analytics-kpi-card {
     gap: 10px;
-    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-columns: 40px minmax(0, 1fr);
     min-height: 96px;
     padding: 14px;
   }
@@ -5272,11 +5315,11 @@ select {
 
   .common-table {
     max-width: calc(100vw - 24px);
-    padding: 6px;
+    padding: 8px;
   }
 
   .common-table table {
-    min-width: 760px;
+    min-width: 680px;
   }
 
   .orders-panel th,
@@ -5295,7 +5338,11 @@ select {
   }
 
   .table-pagination {
+    align-items: center;
     font-size: 12px;
+    gap: 6px;
+    justify-content: center;
+    min-width: 100%;
   }
 
   .table-pagination button,
@@ -5375,8 +5422,17 @@ select {
     gap: 8px;
   }
 
+  .current-time {
+    flex-basis: 78px;
+    min-width: 72px;
+  }
+
+  .current-time > svg {
+    display: none;
+  }
+
   .current-time strong {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .topbar-bell svg {
