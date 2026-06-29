@@ -210,16 +210,26 @@ type DashboardCounts = {
   newUsers: number;
   subscriptions: number;
   amount: number;
+  basicSubscriptionRevenue?: number;
+  creditRepairRevenue?: number;
   revenue?: {
     total: number;
+    basicSubscription?: number;
+    creditRepair?: number;
     subscriptions: number;
     cibilRepair: number;
   };
+  otp_login_no_pan?: number;
+  pan_submitted?: number;
+  checkout_started?: number;
+  subscribed?: number;
   upcomingOverdues: number;
   totalMessages: number;
   totalFeedback?: number;
+  totalContactRequests?: number;
   totalCreditReports?: number;
   reportsWithScore?: number;
+  totalDocuments?: number;
   totalNotifications?: number;
   unreadNotifications?: number;
   apiHistoryCount?: number;
@@ -239,6 +249,18 @@ type DashboardCounts = {
     approved: number;
     rejected: number;
     pending: number;
+  };
+  cibilRepair?: {
+    total: number;
+    paid: number;
+    open: number;
+    closed: number;
+  };
+  disputes?: {
+    total: number;
+    open: number;
+    resolved: number;
+    rejected: number;
   };
   graphs: {
     usersByAccessType: Array<{ label: string; count: number; percentage: number }>;
@@ -261,7 +283,7 @@ type AdminUser = {
   loginEventId?: string;
 };
 
-type AppView = "Dashboard" | "General" | "Website Settings" | "Homepage Themes" | "Legal Center" | "Notifications" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Basic Subscriptions" | "Repair Subscriptions" | "Users" | "Employees" | "Roles" | "Login History" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
+type AppView = "Dashboard" | "General" | "Website Settings" | "Homepage Themes" | "Legal Center" | "Notifications" | "Announcement" | "Plans & Benefits" | "Basic Plan" | "Credit Repair" | "Disputes" | "Basic Subscription" | "Repair Service Subscription" | "Basic Subscriptions" | "Repair Subscriptions" | "Users" | "Employees" | "Roles" | "Login History" | "Loans" | "Chats" | "FAQs" | "Feedback" | "Contact Us" | "Report Downloads" | "Download CIBIL" | "Manual Report" | "API Logs";
 
 type ManualReportType = "experian" | "cibil" | "crif";
 
@@ -278,6 +300,7 @@ const viewRoutes: Record<AppView, string> = {
   "Homepage Themes": "/homepage-themes",
   "Legal Center": "/legal-center",
   Notifications: "/notifications",
+  Announcement: "/announcement",
   "Plans & Benefits": "/plans-benefits",
   "Basic Plan": "/basic-plan",
   "Credit Repair": "/services/credit-repair",
@@ -309,6 +332,7 @@ const routeViews: Record<string, AppView> = {
   "/homepage-themes": "Homepage Themes",
   "/legal-center": "Legal Center",
   "/notifications": "Notifications",
+  "/announcement": "Announcement",
   "/faqs": "FAQs",
   "/plans-benefits": "Plans & Benefits",
   "/basic-plan": "Basic Plan",
@@ -339,6 +363,7 @@ const viewAccessMap: Record<AppView, { menuName: string; childMenuName: string |
   "Homepage Themes": { menuName: "General", childMenuName: "Homepage Themes" },
   "Legal Center": { menuName: "General", childMenuName: "Legal Center" },
   Notifications: { menuName: "General", childMenuName: "Notifications" },
+  Announcement: { menuName: "General", childMenuName: "Announcement" },
   "Plans & Benefits": { menuName: "Plans & Benefits", childMenuName: "Repair service" },
   "Basic Plan": { menuName: "Plans & Benefits", childMenuName: "Basic plan" },
   "Credit Repair": { menuName: "Credit Repair", childMenuName: "Repair Requests" },
@@ -821,6 +846,7 @@ type EmployeeRow = {
   status: string;
   joinedAt: string | null;
   createdAt?: string;
+  reportsTo?: string | null;
 };
 
 type EmployeesResponse = {
@@ -831,6 +857,20 @@ type EmployeesResponse = {
     total: number;
     totalPages: number;
   };
+};
+
+type EmployeeDetail = {
+  employee: EmployeeRow;
+  recentLoginActivity: Array<{
+    id: string | number;
+    loginStatus: string;
+    browser?: string | null;
+    location?: string | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    loggedInAt?: string | null;
+  }>;
+  permissions: EmployeeMenuAccess[];
 };
 
 type EmployeeForm = {
@@ -1238,6 +1278,31 @@ type WebsiteSettingsResponse = {
   updatedAt: string;
 };
 
+type AnnouncementRow = {
+  id?: string | number;
+  publicId?: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  createdAt?: string;
+};
+
+type AnnouncementsResponse = {
+  announcements: AnnouncementRow[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+type AnnouncementForm = {
+  title: string;
+  startDate: string;
+  endDate: string;
+};
+
 type HomepageTheme = {
   id?: number;
   imageName: string;
@@ -1366,6 +1431,9 @@ export default function Home() {
   const [employeesStatus, setEmployeesStatus] = useState("");
   const [employeesError, setEmployeesError] = useState("");
   const [isEmployeesLoading, setIsEmployeesLoading] = useState(false);
+  const [selectedEmployeeDetail, setSelectedEmployeeDetail] = useState<EmployeeDetail | null>(null);
+  const [selectedEmployeeError, setSelectedEmployeeError] = useState("");
+  const [isEmployeeDetailLoading, setIsEmployeeDetailLoading] = useState(false);
   const [isEmployeeSaving, setIsEmployeeSaving] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -1476,6 +1544,19 @@ export default function Home() {
   const [isWebsiteSettingsLoading, setIsWebsiteSettingsLoading] = useState(false);
   const [isWebsiteSettingsSaving, setIsWebsiteSettingsSaving] = useState(false);
   const [hasLoadedWebsiteSettings, setHasLoadedWebsiteSettings] = useState(false);
+  const [announcementTab, setAnnouncementTab] = useState<"new" | "history">("new");
+  const [announcementForm, setAnnouncementForm] = useState<AnnouncementForm>({
+    title: "",
+    startDate: "",
+    endDate: "",
+  });
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState("");
+  const [deletingAnnouncementId, setDeletingAnnouncementId] = useState("");
+  const [announcementsData, setAnnouncementsData] = useState<AnnouncementsResponse | null>(null);
+  const [announcementError, setAnnouncementError] = useState("");
+  const [isAnnouncementsLoading, setIsAnnouncementsLoading] = useState(false);
+  const [isAnnouncementSaving, setIsAnnouncementSaving] = useState(false);
+  const [hasLoadedAnnouncements, setHasLoadedAnnouncements] = useState(false);
   const [homepageThemes, setHomepageThemes] = useState<HomepageTheme[]>([]);
   const [homepageThemeForm, setHomepageThemeForm] = useState<HomepageThemeForm>({
     imageName: "",
@@ -2210,6 +2291,44 @@ export default function Home() {
     }
   }
 
+  async function loadEmployeeDetail(publicId: string) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setSelectedEmployeeError("");
+      setIsEmployeeDetailLoading(true);
+      setSelectedEmployeeDetail(null);
+      const response = await fetch(`${API_BASE_URL}/admin/employees/${publicId}`, {
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || (result.status && result.status !== "success")) {
+        throw new Error(result.message || "Unable to load employee details");
+      }
+
+      const detail = result.data || result;
+      setSelectedEmployeeDetail({
+        employee: detail.employee,
+        recentLoginActivity: detail.recentLoginActivity || [],
+        permissions: detail.permissions || [],
+      });
+    } catch (error) {
+      setSelectedEmployeeError(error instanceof Error ? error.message : "Unable to load employee details");
+    } finally {
+      setIsEmployeeDetailLoading(false);
+    }
+  }
+
   function getEmployeeRoles(result: { data?: EmployeeRolesResponse | EmployeeRole[] }) {
     if (Array.isArray(result.data)) {
       return result.data;
@@ -2433,6 +2552,13 @@ export default function Home() {
     setIsEmployeeModalOpen(true);
   }
 
+  function closeEmployeeForm() {
+    setIsEmployeeModalOpen(false);
+    setSelectedEmployeeDetail(null);
+    setSelectedEmployeeError("");
+    resetEmployeeForm();
+  }
+
   async function saveEmployee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -2460,7 +2586,7 @@ export default function Home() {
             department: employeeForm.department,
             designation: employeeForm.designation,
             status: employeeForm.status,
-            joinedAt: employeeForm.joinedAt,
+            joinedAt: getTodayDateValue(),
           }),
         }
       );
@@ -2479,6 +2605,8 @@ export default function Home() {
 
       showToast("success", editingEmployeeId ? "Employee updated successfully" : "Employee added successfully");
       setIsEmployeeModalOpen(false);
+      setSelectedEmployeeDetail(null);
+      setSelectedEmployeeError("");
       resetEmployeeForm();
       await loadEmployees(employeesData?.pagination.page || 1);
     } catch (error) {
@@ -3100,6 +3228,165 @@ export default function Home() {
       setWebsiteSettingsError(error instanceof Error ? error.message : "Unable to load website settings");
     } finally {
       setIsWebsiteSettingsLoading(false);
+    }
+  }
+
+  async function loadAnnouncements(page = announcementsData?.pagination?.page ?? 1) {
+    if (!adminUser?.token) {
+      return;
+    }
+
+    try {
+      setAnnouncementError("");
+      setIsAnnouncementsLoading(true);
+      const params = new URLSearchParams({ page: String(page), limit: "10" });
+      const response = await fetch(`${API_BASE_URL}/admin/announcements?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+        },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to load announcements");
+      }
+
+      const data = result.data || {};
+      const announcements = data.announcements || data.items || (Array.isArray(data) ? data : []);
+      setAnnouncementsData({
+        announcements,
+        pagination: data.pagination,
+      });
+      setHasLoadedAnnouncements(true);
+    } catch (error) {
+      setAnnouncementError(error instanceof Error ? error.message : "Unable to load announcements");
+    } finally {
+      setIsAnnouncementsLoading(false);
+    }
+  }
+
+  function resetAnnouncementForm() {
+    setAnnouncementForm({ title: "", startDate: "", endDate: "" });
+    setEditingAnnouncementId("");
+  }
+
+  function editAnnouncement(announcement: AnnouncementRow) {
+    const announcementId = announcement.publicId || String(announcement.id || "");
+
+    if (!announcementId) {
+      setAnnouncementError("Announcement id missing");
+      return;
+    }
+
+    setAnnouncementForm({
+      title: announcement.title || "",
+      startDate: announcement.startDate?.slice(0, 10) || "",
+      endDate: announcement.endDate?.slice(0, 10) || "",
+    });
+    setEditingAnnouncementId(announcementId);
+    setAnnouncementTab("new");
+  }
+
+  async function saveAnnouncement(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!adminUser?.token) {
+      return;
+    }
+
+    if (!announcementForm.title.trim() || !announcementForm.startDate || !announcementForm.endDate) {
+      setAnnouncementError("Title, start date and end date are required");
+      return;
+    }
+
+    try {
+      setAnnouncementError("");
+      setIsAnnouncementSaving(true);
+      const response = await fetch(
+        editingAnnouncementId
+          ? `${API_BASE_URL}/admin/announcements/${editingAnnouncementId}`
+          : `${API_BASE_URL}/admin/announcements`,
+        {
+        method: editingAnnouncementId ? "PATCH" : "POST",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(announcementForm),
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || `Unable to ${editingAnnouncementId ? "update" : "create"} announcement`);
+      }
+
+      showToast("success", `Announcement ${editingAnnouncementId ? "updated" : "created"} successfully`);
+      resetAnnouncementForm();
+      setAnnouncementTab("history");
+      await loadAnnouncements(1);
+    } catch (error) {
+      setAnnouncementError(error instanceof Error ? error.message : `Unable to ${editingAnnouncementId ? "update" : "create"} announcement`);
+    } finally {
+      setIsAnnouncementSaving(false);
+    }
+  }
+
+  async function deleteAnnouncement(announcement: AnnouncementRow) {
+    const announcementId = announcement.publicId || String(announcement.id || "");
+
+    if (!adminUser?.token || !announcementId) {
+      return;
+    }
+
+    if (!window.confirm("Delete this announcement?")) {
+      return;
+    }
+
+    try {
+      setAnnouncementError("");
+      setDeletingAnnouncementId(announcementId);
+      const response = await fetch(`${API_BASE_URL}/admin/announcements/${announcementId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${adminUser.token}`,
+        },
+      });
+      const result = await response.json();
+
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem("scorecare_admin");
+        setStep("mobile");
+        setAdminUser(null);
+        return;
+      }
+
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.message || "Unable to delete announcement");
+      }
+
+      showToast("success", "Announcement deleted successfully");
+      if (editingAnnouncementId === announcementId) {
+        resetAnnouncementForm();
+      }
+      await loadAnnouncements();
+    } catch (error) {
+      setAnnouncementError(error instanceof Error ? error.message : "Unable to delete announcement");
+    } finally {
+      setDeletingAnnouncementId("");
     }
   }
 
@@ -4980,6 +5267,12 @@ export default function Home() {
   }, [activeView, adminUser?.token, hasLoadedWebsiteSettings, isWebsiteSettingsLoading]);
 
   useEffect(() => {
+    if (adminUser?.token && !hasLoadedAnnouncements && !isAnnouncementsLoading) {
+      loadAnnouncements();
+    }
+  }, [adminUser?.token, hasLoadedAnnouncements, isAnnouncementsLoading]);
+
+  useEffect(() => {
     if (activeView === "Homepage Themes" && adminUser?.token && !hasLoadedHomepageThemes && !isHomepageThemesLoading) {
       loadHomepageThemes();
     }
@@ -5463,25 +5756,73 @@ export default function Home() {
     const repairStatusGraph = dashboardCounts?.graphs.cibilRepairByStatus ?? [];
     const disputesStatusGraph = dashboardCounts?.graphs.disputesByStatus ?? [];
     const totalRevenue = dashboardCounts?.revenue?.total ?? dashboardCounts?.amount ?? 0;
-    const kpiCards = [
-      { label: "Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, icon: dashboardIcons.users, trend: "2.29% ↗", view: "Users" as AppView, tone: "orange" },
-      { label: "Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}`, meta: "Total collected", icon: dashboardIcons.revenue, trend: "2.19% ↗", view: "Basic Subscription" as AppView, tone: "green" },
-      { label: "Subscriptions", value: dashboardCounts?.subscriptions ?? 0, meta: `${dashboardCounts?.upcomingOverdues ?? 0} past due`, icon: dashboardIcons.subscriptions, trend: "3.19% ↘", view: "Basic Subscriptions" as AppView, tone: "blue" },
-      { label: "Credit Reports", value: dashboardCounts?.totalCreditReports ?? 0, meta: `${dashboardCounts?.reportsWithScore ?? 0} with score`, icon: dashboardIcons.reports, trend: "0.00% →", view: "Report Downloads" as AppView, tone: "purple" },
-      { label: "Messages", value: dashboardCounts?.totalMessages ?? 0, meta: "Total chats", icon: dashboardIcons.messages, trend: "1.24% ↗", view: "Chats" as AppView, tone: "cyan" },
-      { label: "Feedback", value: dashboardCounts?.totalFeedback ?? 0, meta: "User ratings", icon: dashboardIcons.feedback, trend: "2.02% ↗", view: "Feedback" as AppView, tone: "red" },
-      { label: "Notifications", value: dashboardCounts?.totalNotifications ?? 0, meta: `${dashboardCounts?.unreadNotifications ?? 0} unread`, icon: dashboardIcons.notifications, trend: "0.00% →", view: "Notifications" as AppView, tone: "orange" },
-      { label: "Employees", value: dashboardCounts?.employees?.total ?? 0, meta: `${dashboardCounts?.employees?.active ?? 0} active`, icon: dashboardIcons.employees, trend: "0.00% →", view: "Employees" as AppView, tone: "green" },
-      { label: "Roles", value: dashboardCounts?.roles?.total ?? 0, meta: `${dashboardCounts?.roles?.active ?? 0} active`, icon: dashboardIcons.roles, trend: "0.00% →", view: "Roles" as AppView, tone: "blue" },
-      { label: "API History", value: dashboardCounts?.apiHistoryCount ?? 0, meta: "Credit bureau requests", icon: dashboardIcons.apiLogs, trend: "0.00% →", view: "API Logs" as AppView, tone: "purple" },
+    const basicRevenue = dashboardCounts?.revenue?.basicSubscription ?? dashboardCounts?.revenue?.subscriptions ?? dashboardCounts?.basicSubscriptionRevenue ?? 0;
+    const repairRevenue = dashboardCounts?.revenue?.creditRepair ?? dashboardCounts?.revenue?.cibilRepair ?? dashboardCounts?.creditRepairRevenue ?? 0;
+    const dashboardKpiSections = [
+      {
+        title: "Revenue",
+        cards: [
+          { label: "Total Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}`, meta: "Collected", icon: dashboardIcons.revenue, view: "Basic Subscription" as AppView, tone: "green" },
+          { label: "Basic Revenue", value: `₹${basicRevenue.toLocaleString("en-IN")}`, meta: `${dashboardCounts?.subscriptions ?? 0} subscriptions`, icon: dashboardIcons.subscriptions, view: "Basic Subscription" as AppView, tone: "blue" },
+          { label: "Repair Revenue", value: `₹${repairRevenue.toLocaleString("en-IN")}`, meta: `${dashboardCounts?.cibilRepair?.paid ?? 0} paid`, icon: dashboardIcons.revenue, view: "Repair Service Subscription" as AppView, tone: "cyan" },
+        ],
+      },
+      {
+        title: "User Funnel",
+        cards: [
+          { label: "Total Users", value: dashboardCounts?.totalUsers ?? 0, meta: `${dashboardCounts?.newUsers ?? 0} new`, icon: dashboardIcons.users, view: "Users" as AppView, tone: "orange" },
+          { label: "OTP No PAN", value: dashboardCounts?.otp_login_no_pan ?? 0, meta: "Login only", icon: dashboardIcons.users, view: "Users" as AppView, tone: "purple" },
+          { label: "PAN Submitted", value: dashboardCounts?.pan_submitted ?? 0, meta: "KYC step", icon: dashboardIcons.reports, view: "Users" as AppView, tone: "green" },
+          { label: "Checkout Started", value: dashboardCounts?.checkout_started ?? 0, meta: "Payment intent", icon: dashboardIcons.revenue, view: "Basic Subscriptions" as AppView, tone: "blue" },
+          { label: "Subscribed", value: dashboardCounts?.subscribed ?? dashboardCounts?.subscriptions ?? 0, meta: `${dashboardCounts?.upcomingOverdues ?? 0} past due`, icon: dashboardIcons.subscriptions, view: "Basic Subscriptions" as AppView, tone: "cyan" },
+        ],
+      },
+      {
+        title: "Activity",
+        cards: [
+          { label: "Messages", value: dashboardCounts?.totalMessages ?? 0, meta: "Chats", icon: dashboardIcons.messages, view: "Chats" as AppView, tone: "cyan" },
+          { label: "Feedback", value: dashboardCounts?.totalFeedback ?? 0, meta: "Ratings", icon: dashboardIcons.feedback, view: "Feedback" as AppView, tone: "red" },
+          { label: "Contact Requests", value: dashboardCounts?.totalContactRequests ?? 0, meta: "Website leads", icon: menuIcons["Contact Us"], view: "Contact Us" as AppView, tone: "orange" },
+          { label: "Notifications", value: dashboardCounts?.totalNotifications ?? 0, meta: `${dashboardCounts?.unreadNotifications ?? 0} unread`, icon: dashboardIcons.notifications, view: "Notifications" as AppView, tone: "purple" },
+        ],
+      },
+      {
+        title: "Services",
+        cards: [
+          { label: "Credit Reports", value: dashboardCounts?.totalCreditReports ?? 0, meta: `${dashboardCounts?.reportsWithScore ?? 0} with score`, icon: dashboardIcons.reports, view: "Report Downloads" as AppView, tone: "purple" },
+          { label: "Documents", value: dashboardCounts?.totalDocuments ?? 0, meta: "Uploaded", icon: dashboardIcons.reports, view: "Manual Report" as AppView, tone: "blue" },
+          { label: "CIBIL Repair", value: dashboardCounts?.cibilRepair?.total ?? 0, meta: `${dashboardCounts?.cibilRepair?.open ?? 0} open`, icon: dashboardIcons.reports, view: "Credit Repair" as AppView, tone: "green" },
+          { label: "Disputes", value: dashboardCounts?.disputes?.total ?? 0, meta: `${dashboardCounts?.disputes?.resolved ?? 0} resolved`, icon: dashboardIcons.feedback, view: "Disputes" as AppView, tone: "red" },
+          { label: "Loans", value: dashboardCounts?.loans?.applied ?? 0, meta: `${dashboardCounts?.loans?.pending ?? 0} pending`, icon: menuIcons.Loans, view: "Loans" as AppView, tone: "orange" },
+          { label: "API History", value: dashboardCounts?.apiHistoryCount ?? 0, meta: "Bureau requests", icon: dashboardIcons.apiLogs, view: "API Logs" as AppView, tone: "cyan" },
+        ],
+      },
+      {
+        title: "Admin",
+        cards: [
+          { label: "Employees", value: dashboardCounts?.employees?.total ?? 0, meta: `${dashboardCounts?.employees?.active ?? 0} active`, icon: dashboardIcons.employees, view: "Employees" as AppView, tone: "green" },
+          { label: "Roles", value: dashboardCounts?.roles?.total ?? 0, meta: `${dashboardCounts?.roles?.active ?? 0} active`, icon: dashboardIcons.roles, view: "Roles" as AppView, tone: "blue" },
+        ],
+      },
     ];
-    const pieColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444", "#7c3aed"];
-    const subscriptionColors = ["#1769e0", "#13a8a8", "#f59e0b", "#ef4444"];
+    const chartColors = {
+      axis: "#a7b2c3",
+      grid: "#314154",
+      blue: "#4f8cff",
+      teal: "#22d3c5",
+      amber: "#fbbf24",
+      red: "#fb7185",
+      violet: "#a78bfa",
+      green: "#34d399",
+      mutedBlue: "#8db5ff",
+    };
+    const pieColors = [chartColors.blue, chartColors.teal, chartColors.amber, chartColors.red, chartColors.violet, chartColors.green];
+    const subscriptionColors = [chartColors.green, chartColors.blue, chartColors.amber, chartColors.red];
     const revenueBreakdown = dashboardCounts?.revenue
       ? [{
         name: "Revenue",
-        subscriptionRevenue: dashboardCounts.revenue.subscriptions,
-        cibilRepairRevenue: dashboardCounts.revenue.cibilRepair,
+        subscriptionRevenue: basicRevenue,
+        cibilRepairRevenue: repairRevenue,
       }]
       : [];
     const feedbackBars = [1, 2, 3, 4, 5].map((rating) => {
@@ -5517,6 +5858,9 @@ export default function Home() {
     const canUpdateWebsiteSettings = hasActionPermission("Website Settings", "update");
     const canUpdateLegal = hasActionPermission("Legal Center", "update");
     const canCreateNotifications = hasActionPermission("Notifications", "create");
+    const canCreateAnnouncement = hasActionPermission("Announcement", "create");
+    const canUpdateAnnouncement = hasActionPermission("Announcement", "update");
+    const canDeleteAnnouncement = hasActionPermission("Announcement", "delete");
     const canCreateFaqs = hasActionPermission("FAQs", "create");
     const canUpdateFaqs = hasActionPermission("FAQs", "update");
     const canDeleteFaqs = hasActionPermission("FAQs", "delete");
@@ -5538,6 +5882,10 @@ export default function Home() {
     const canUpdateSubscriptions = hasActionPermission("Basic Subscriptions", "update");
     const canExportLoans = hasActionPermission("Loans", "export");
     const canUpdateLoans = hasActionPermission("Loans", "update");
+    const activeAnnouncementTitles = (announcementsData?.announcements ?? [])
+      .filter(isAnnouncementActive)
+      .map((announcement) => announcement.title)
+      .filter(Boolean);
     const loadedUsers = usersData?.users ?? [];
     const userStatusCards = [
       {
@@ -5614,6 +5962,35 @@ export default function Home() {
       formatDate(download.reportFetchedAt),
       formatDate(download.downloadedAt),
     ]) ?? [];
+    const announcementColumns = ["Title", "Start Date", "End Date", "Created At", ...(canUpdateAnnouncement || canDeleteAnnouncement ? ["Action"] : [])];
+    const announcementRows = announcementsData?.announcements.map((announcement) => [
+      announcement.title || "-",
+      formatDate(announcement.startDate || null),
+      formatDate(announcement.endDate || null),
+      formatDate(announcement.createdAt || null),
+      ...(canUpdateAnnouncement || canDeleteAnnouncement
+        ? [
+          <div className="homepage-theme-row-actions">
+            {canUpdateAnnouncement ? (
+              <button type="button" onClick={() => editAnnouncement(announcement)}>
+                <ActionIcon type="edit" />
+                Edit
+              </button>
+            ) : null}
+            {canDeleteAnnouncement ? (
+              <button
+                disabled={deletingAnnouncementId === (announcement.publicId || String(announcement.id || ""))}
+                type="button"
+                onClick={() => deleteAnnouncement(announcement)}
+              >
+                <ActionIcon type="delete" />
+                Delete
+              </button>
+            ) : null}
+          </div>,
+        ]
+        : []),
+    ]) ?? [];
     const apiLogColumns = [
       "Bureau",
       "Operation",
@@ -5689,7 +6066,7 @@ export default function Home() {
       formatDate(employee.joinedAt),
       ...(canUpdateEmployees || canDeleteEmployees
         ? [
-          <div className="homepage-theme-row-actions">
+          <div className="homepage-theme-row-actions" onClick={(event) => event.stopPropagation()}>
             {canUpdateEmployees ? (
               <button type="button" onClick={() => openEmployeeModal(employee)}>
                 <ActionIcon type="edit" />
@@ -6048,8 +6425,8 @@ export default function Home() {
                         Dashboard
                       </button>
                     ) : null}
-                    {["General", "Website Settings", "Homepage Themes", "Legal Center", "Notifications", "FAQs"].some((view) => hasViewPermission(view as AppView)) ? (
-                      <div className={`sidebar-group ${activeView === "General" || activeView === "Website Settings" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "FAQs" ? "active" : ""}`}>
+                    {["General", "Website Settings", "Homepage Themes", "Legal Center", "Notifications", "Announcement", "FAQs"].some((view) => hasViewPermission(view as AppView)) ? (
+                      <div className={`sidebar-group ${activeView === "General" || activeView === "Website Settings" || activeView === "Homepage Themes" || activeView === "Legal Center" || activeView === "Notifications" || activeView === "Announcement" || activeView === "FAQs" ? "active" : ""}`}>
                         <button className="sidebar-group-toggle" type="button" onClick={() => setIsGeneralMenuOpen((current) => !current)}>
                           <span className="menu-icon">{menuIcons.General}</span>
                           General
@@ -6062,6 +6439,7 @@ export default function Home() {
                             {hasViewPermission("Homepage Themes") ? <button className={activeView === "Homepage Themes" ? "active" : ""} type="button" onClick={() => openAdminView("Homepage Themes")}><span className="menu-icon">{menuIcons["Homepage Themes"]}</span>Homepage Themes</button> : null}
                             {hasViewPermission("Legal Center") ? <button className={activeView === "Legal Center" ? "active" : ""} type="button" onClick={() => openAdminView("Legal Center")}><span className="menu-icon">{menuIcons["Legal Center"]}</span>Legal Center</button> : null}
                             {hasViewPermission("Notifications") ? <button className={activeView === "Notifications" ? "active" : ""} type="button" onClick={() => openAdminView("Notifications")}><span className="menu-icon">{menuIcons.Notifications}</span>Notifications</button> : null}
+                            {hasViewPermission("Announcement") ? <button className={activeView === "Announcement" ? "active" : ""} type="button" onClick={() => openAdminView("Announcement")}><span className="menu-icon">{menuIcons.Notifications}</span>Announcement</button> : null}
                             {hasViewPermission("FAQs") ? <button className={activeView === "FAQs" ? "active" : ""} type="button" onClick={() => openAdminView("FAQs")}><span className="menu-icon">{menuIcons.FAQ}</span>FAQ</button> : null}
                           </div>
                         ) : null}
@@ -6196,6 +6574,14 @@ export default function Home() {
               </button>
             </div>
             {/* <div className="search-box">⌕ <span>Search here...</span></div> */}
+            {activeAnnouncementTitles.length ? (
+              <div className="topbar-announcement" aria-label="Active announcements">
+                <div className="flex items-center gap-2">
+ 
+              <span>📢{activeAnnouncementTitles.join(" • ")}</span>
+            </div>
+              </div>
+            ) : null}
             <div className="topbar-profile">
               <div className="current-time" aria-label="Current time">
                 <svg viewBox="0 0 24 24">
@@ -6243,7 +6629,7 @@ export default function Home() {
 
                 {generalError ? <p className="dashboard-error">{generalError}</p> : null}
 
-                <form className="general-form panel" onSubmit={updateGeneralSettings}>
+                <form className="general-form panel" key="general-settings-form" onSubmit={updateGeneralSettings}>
                   {isGeneralLoading ? <span className="table-loader" /> : null}
                   <label>
                     Website
@@ -6326,12 +6712,13 @@ export default function Home() {
 
                 {websiteSettingsError ? <p className="dashboard-error">{websiteSettingsError}</p> : null}
 
-                <form className="general-form panel" onSubmit={updateWebsiteSettings}>
+                <form className="general-form panel" key="website-settings-form" onSubmit={updateWebsiteSettings}>
                   {isWebsiteSettingsLoading ? <span className="table-loader" /> : null}
                   <label>
                     Privacy Policy
                     <input
                       accept="application/pdf"
+                      defaultValue=""
                       type="file"
                       onChange={(event) => setWebsiteSettingsFiles((files) => ({ ...files, privacyPolicy: event.target.files?.[0] || null }))}
                     />
@@ -6343,6 +6730,7 @@ export default function Home() {
                     Terms Of Service
                     <input
                       accept="application/pdf"
+                      defaultValue=""
                       type="file"
                       onChange={(event) => setWebsiteSettingsFiles((files) => ({ ...files, termsOfService: event.target.files?.[0] || null }))}
                     />
@@ -6354,6 +6742,7 @@ export default function Home() {
                     Disclaimer
                     <input
                       accept="application/pdf"
+                      defaultValue=""
                       type="file"
                       onChange={(event) => setWebsiteSettingsFiles((files) => ({ ...files, disclaimer: event.target.files?.[0] || null }))}
                     />
@@ -6365,6 +6754,7 @@ export default function Home() {
                     Account Deletion
                     <input
                       accept="application/pdf"
+                      defaultValue=""
                       type="file"
                       onChange={(event) => setWebsiteSettingsFiles((files) => ({ ...files, accountDeletion: event.target.files?.[0] || null }))}
                     />
@@ -6381,6 +6771,90 @@ export default function Home() {
                     </div>
                   ) : null}
                 </form>
+              </>
+            ) : activeView === "Announcement" ? (
+              <>
+                <section className="welcome-panel">
+                  <div>
+                    <h2>Announcement</h2>
+                    <p>Create and review announcements</p>
+                  </div>
+                  <span>{announcementsData?.pagination?.total ?? announcementsData?.announcements.length ?? 0} records</span>
+                </section>
+
+                <div className="section-tabs">
+                  <button className={announcementTab === "new" ? "active" : ""} type="button" onClick={() => {
+                    resetAnnouncementForm();
+                    setAnnouncementTab("new");
+                  }}>
+                    {editingAnnouncementId ? "Edit" : "New"}
+                  </button>
+                  <button className={announcementTab === "history" ? "active" : ""} type="button" onClick={() => setAnnouncementTab("history")}>
+                    History
+                  </button>
+                </div>
+
+                {announcementError ? <p className="dashboard-error">{announcementError}</p> : null}
+
+                {announcementTab === "new" ? (
+                  <form className="general-form panel" onSubmit={saveAnnouncement}>
+                    <label>
+                      Title
+                      <input
+                        required
+                        value={announcementForm.title}
+                        onChange={(event) => setAnnouncementForm((form) => ({ ...form, title: event.target.value }))}
+                      />
+                    </label>
+                    <div className="announcement-date-row">
+                      <label>
+                        Start Date
+                        <DateFilter
+                          label="Start date"
+                          value={announcementForm.startDate}
+                          onChange={(value) => setAnnouncementForm((form) => ({ ...form, startDate: value }))}
+                        />
+                      </label>
+                      <label>
+                        End Date
+                        <DateFilter
+                          label="End date"
+                          value={announcementForm.endDate}
+                          onChange={(value) => setAnnouncementForm((form) => ({ ...form, endDate: value }))}
+                        />
+                      </label>
+                    </div>
+                    {(editingAnnouncementId ? canUpdateAnnouncement : canCreateAnnouncement) ? (
+                      <div className="general-actions">
+                        {editingAnnouncementId ? (
+                          <button type="button" onClick={resetAnnouncementForm}>
+                            Cancel
+                          </button>
+                        ) : null}
+                        <button disabled={isAnnouncementSaving} type="submit">
+                          {isAnnouncementSaving ? "Saving..." : editingAnnouncementId ? "Update" : "Submit"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </form>
+                ) : (
+                  <CommonTable
+                    columns={announcementColumns}
+                    emptyText={isAnnouncementsLoading ? "Loading announcements..." : "No announcements found"}
+                    isLoading={isAnnouncementsLoading}
+                    pagination={
+                      announcementsData?.pagination
+                        ? {
+                          page: announcementsData.pagination.page,
+                          totalPages: announcementsData.pagination.totalPages,
+                          onPrevious: () => loadAnnouncements(announcementsData.pagination!.page - 1),
+                          onNext: () => loadAnnouncements(announcementsData.pagination!.page + 1),
+                        }
+                        : undefined
+                    }
+                    rows={announcementRows}
+                  />
+                )}
               </>
             ) : activeView === "Homepage Themes" ? (
               <>
@@ -7534,54 +8008,253 @@ export default function Home() {
               </>
             ) : activeView === "Employees" ? (
               <>
-                <section className="welcome-panel">
-                  <div>
-                    <h2>Employees</h2>
-                    <p>Manage employee records</p>
-                  </div>
-                  <span>{employeesData?.pagination.total ?? 0} employees</span>
-                </section>
+                {isEmployeeModalOpen ? (
+                  <section className="employee-form-page">
+                    <div className="employee-detail-header">
+                      <div>
+                        <h2>{editingEmployeeId ? "Edit employee" : "Add employee"}</h2>
+                        <p>{editingEmployeeId ? "Modify employee record" : "Create a new employee record"}</p>
+                      </div>
+                      <div className="employee-detail-actions">
+                        <button type="button" onClick={closeEmployeeForm}>
+                          <ActionIcon type="back" />
+                          Back to employees
+                        </button>
+                      </div>
+                    </div>
 
-                <section className="table-toolbar employee-toolbar">
-                  <input
-                    placeholder="Search employees..."
-                    value={employeesSearch}
-                    onChange={(event) => setEmployeesSearch(event.target.value)}
-                  />
-                  <select value={employeesStatus} onChange={(event) => setEmployeesStatus(event.target.value)}>
-                    <option value="">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                  <button type="button" onClick={() => loadEmployees(1)}>
-                    Search
-                  </button>
-                  {canCreateEmployees ? (
-                    <button className="add-button" type="button" onClick={() => openEmployeeModal()}>
-                      <ActionIcon type="add" />
-                      Add Employee
-                    </button>
-                  ) : null}
-                </section>
+                    {employeesError ? <p className="dashboard-error">{employeesError}</p> : null}
 
-                {employeesError ? <p className="dashboard-error">{employeesError}</p> : null}
+                    <form className="employee-page-form" onSubmit={saveEmployee}>
+                      <section>
+                        <h3>Basic details</h3>
+                        <div className="employee-page-form-grid">
+                          <label>
+                            Full name
+                            <input required placeholder="e.g. Priya Nair" value={employeeForm.fullName} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, fullName: event.target.value }))} />
+                          </label>
+                          <label>
+                            Mobile number
+                            <input required maxLength={10} placeholder="98xxxxxx21" value={employeeForm.mobileNumber} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, mobileNumber: event.target.value.replace(/\D/g, "") }))} />
+                          </label>
+                          <label>
+                            Email address
+                            <input required placeholder="name@company.com" type="email" value={employeeForm.email} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, email: event.target.value }))} />
+                          </label>
+                        </div>
+                      </section>
 
-                <CommonTable
-                  columns={employeeColumns}
-                  emptyText={isEmployeesLoading ? "Loading employees..." : "No employees found"}
-                  isLoading={isEmployeesLoading}
-                  pagination={
-                    employeesData
-                      ? {
-                        page: employeesData.pagination.page,
-                        totalPages: employeesData.pagination.totalPages,
-                        onPrevious: () => loadEmployees(employeesData.pagination.page - 1),
-                        onNext: () => loadEmployees(employeesData.pagination.page + 1),
+                      <section>
+                        <h3>Role and department</h3>
+                        <div className="employee-page-form-grid">
+                          <label>
+                            Role
+                            <select
+                              value={employeeForm.rolePublicId}
+                              onChange={(event) => {
+                                const role = employeeRoles.find((item) => item.publicId === event.target.value);
+                                setEmployeeForm((employee) => ({
+                                  ...employee,
+                                  rolePublicId: event.target.value,
+                                  role: role?.roleName || "",
+                                }));
+                              }}
+                            >
+                              <option value="">Select Role</option>
+                              {employeeRoles.map((role) => (
+                                <option key={role.publicId} value={role.publicId}>
+                                  {role.roleName}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            Department
+                            <input required placeholder="Engineering" value={employeeForm.department} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, department: event.target.value }))} />
+                          </label>
+                          <label>
+                            Designation
+                            <input required placeholder="e.g. Manager" value={employeeForm.designation} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, designation: event.target.value }))} />
+                          </label>
+                          <label>
+                            Status
+                            <select value={employeeForm.status} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, status: event.target.value }))}>
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
+                          </label>
+                        </div>
+                      </section>
+
+                      <footer>
+                        <button type="button" onClick={closeEmployeeForm}>
+                          Cancel
+                        </button>
+                        {(editingEmployeeId ? canUpdateEmployees : canCreateEmployees) ? (
+                          <button disabled={isEmployeeSaving} type="submit">
+                            {isEmployeeSaving ? "Saving..." : editingEmployeeId ? "Update employee" : "Save employee"}
+                          </button>
+                        ) : null}
+                      </footer>
+                    </form>
+                  </section>
+                ) : isEmployeeDetailLoading || selectedEmployeeError || selectedEmployeeDetail ? (
+                  <section className="employee-detail-page">
+                    <div className="employee-detail-header">
+                      <div>
+                        <h2>{selectedEmployeeDetail?.employee.fullName || "Employee details"}</h2>
+                        <p>
+                          {[selectedEmployeeDetail?.employee.employeeCode, selectedEmployeeDetail?.employee.department, selectedEmployeeDetail?.employee.designation].filter(Boolean).join(" · ") || "-"}
+                        </p>
+                      </div>
+                      <div className="employee-detail-actions">
+                        <button type="button" onClick={() => {
+                          setSelectedEmployeeDetail(null);
+                          setSelectedEmployeeError("");
+                        }}>
+                          <ActionIcon type="back" />
+                          Back to employees
+                        </button>
+                        {canUpdateEmployees && selectedEmployeeDetail?.employee ? (
+                          <button className="primary" type="button" onClick={() => openEmployeeModal(selectedEmployeeDetail.employee)}>
+                            <ActionIcon type="edit" />
+                            Edit employee
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {isEmployeeDetailLoading ? (
+                      <div className="user-detail-loading">
+                        <span className="table-loader" />
+                      </div>
+                    ) : selectedEmployeeError ? (
+                      <p className="dashboard-error">{selectedEmployeeError}</p>
+                    ) : selectedEmployeeDetail ? (
+                      <div className="employee-detail-grid">
+                        <aside className="employee-detail-card employee-profile-card">
+                          <span>{selectedEmployeeDetail.employee.fullName?.slice(0, 2).toUpperCase() || "--"}</span>
+                          <h3>{selectedEmployeeDetail.employee.fullName}</h3>
+                          <p>{selectedEmployeeDetail.employee.email}</p>
+                          <em className={`employee-status ${selectedEmployeeDetail.employee.status}`}>{formatLabel(selectedEmployeeDetail.employee.status)}</em>
+                          <dl>
+                            <div><dt>Code</dt><dd>{selectedEmployeeDetail.employee.employeeCode}</dd></div>
+                            <div><dt>Mobile</dt><dd>{selectedEmployeeDetail.employee.mobileNumber}</dd></div>
+                            <div><dt>Role</dt><dd>{selectedEmployeeDetail.employee.role}</dd></div>
+                            <div><dt>Joined</dt><dd>{formatDate(selectedEmployeeDetail.employee.joinedAt)}</dd></div>
+                          </dl>
+                        </aside>
+
+                        <div className="employee-detail-main">
+                          <section className="employee-detail-card">
+                            <h3>Department and access</h3>
+                            <div className="employee-access-grid">
+                              <span><small>Department</small><strong>{selectedEmployeeDetail.employee.department || "-"}</strong></span>
+                              <span><small>Designation</small><strong>{selectedEmployeeDetail.employee.designation || "-"}</strong></span>
+                              <span><small>Reports to</small><strong>{selectedEmployeeDetail.employee.reportsTo || "-"}</strong></span>
+                            </div>
+                          </section>
+
+                          <section className="employee-detail-card">
+                            <div className="employee-section-heading">
+                              <h3>Recent login activity</h3>
+                            </div>
+                            {selectedEmployeeDetail.recentLoginActivity.length ? (
+                              <div className="employee-login-list">
+                                {selectedEmployeeDetail.recentLoginActivity.map((activity) => (
+                                  <div key={activity.id}>
+                                    <span>{formatDateTime(activity.loggedInAt || null)}</span>
+                                    <span>{[activity.browser, activity.location].filter(Boolean).join(" · ") || activity.ipAddress || "-"}</span>
+                                    <strong className={activity.loginStatus?.toLowerCase() === "success" ? "success" : "failed"}>{formatLabel(activity.loginStatus || "-")}</strong>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="user-detail-empty">No recent login activity found</p>
+                            )}
+                          </section>
+
+                          <section className="employee-detail-card">
+                            <h3>Permissions</h3>
+                            {selectedEmployeeDetail.permissions.length ? (
+                              <div className="employee-permission-list">
+                                {selectedEmployeeDetail.permissions.map((access) => (
+                                  <div key={`${access.menuName}-${access.childMenuName || ""}`}>
+                                    <strong>{[access.menuName, access.childMenuName].filter(Boolean).join(" · ")}</strong>
+                                    <span>
+                                      {access.permissions.map((permission) => (
+                                        <em key={permission}>{formatLabel(permission)}</em>
+                                      ))}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="user-detail-empty">No permissions found</p>
+                            )}
+                          </section>
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : (
+                  <>
+                    <section className="welcome-panel">
+                      <div>
+                        <h2>Employees</h2>
+                        <p>Manage employee records</p>
+                      </div>
+                      <span>{employeesData?.pagination.total ?? 0} employees</span>
+                    </section>
+
+                    <section className="table-toolbar employee-toolbar">
+                      <input
+                        placeholder="Search employees..."
+                        value={employeesSearch}
+                        onChange={(event) => setEmployeesSearch(event.target.value)}
+                      />
+                      <select value={employeesStatus} onChange={(event) => setEmployeesStatus(event.target.value)}>
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                      <button type="button" onClick={() => loadEmployees(1)}>
+                        Search
+                      </button>
+                      {canCreateEmployees ? (
+                        <button className="add-button" type="button" onClick={() => openEmployeeModal()}>
+                          <ActionIcon type="add" />
+                          Add Employee
+                        </button>
+                      ) : null}
+                    </section>
+
+                    {employeesError ? <p className="dashboard-error">{employeesError}</p> : null}
+
+                    <CommonTable
+                      columns={employeeColumns}
+                      emptyText={isEmployeesLoading ? "Loading employees..." : "No employees found"}
+                      isLoading={isEmployeesLoading}
+                      onRowClick={(rowIndex) => {
+                        const employee = employeesData?.employees[rowIndex];
+                        if (employee?.publicId) {
+                          loadEmployeeDetail(employee.publicId);
+                        }
+                      }}
+                      pagination={
+                        employeesData
+                          ? {
+                            page: employeesData.pagination.page,
+                            totalPages: employeesData.pagination.totalPages,
+                            onPrevious: () => loadEmployees(employeesData.pagination.page - 1),
+                            onNext: () => loadEmployees(employeesData.pagination.page + 1),
+                          }
+                          : undefined
                       }
-                      : undefined
-                  }
-                  rows={employeeRows}
-                />
+                      rows={employeeRows}
+                    />
+                  </>
+                )}
               </>
             ) : activeView === "Roles" ? (
               <>
@@ -8062,21 +8735,8 @@ export default function Home() {
                       <span>👋 Hello {adminUser?.fullName?.split(" ")[0] || "Admin"},</span>
                       <h2>Welcome to your ScoreCare Dashboard!</h2>
                       <p>Monitor users, track revenue, and review service activity in one place.</p>
-                      <button type="button" onClick={() => openAdminView("Users")}>Start AI</button>
                     </div>
                   </div>
-                  <aside className="analytics-ideas-card">
-                    <div className="analytics-ideas-top">
-                      <h3>Ideas for You</h3>
-                      <div>
-                        <button type="button" aria-label="Previous idea">‹</button>
-                        <button type="button" aria-label="Next idea">›</button>
-                      </div>
-                    </div>
-                    <h2>Create a report for your product</h2>
-                    <p>Review users, subscriptions, revenue, and service performance from the latest dashboard data.</p>
-                    <button type="button" onClick={() => openAdminView("Report Downloads")}>Read Now</button>
-                  </aside>
                 </div>
 
                 <section className="table-toolbar dashboard-filter-toolbar">
@@ -8088,34 +8748,40 @@ export default function Home() {
 
                 {dashboardError ? <p className="dashboard-error">{dashboardError}</p> : null}
 
-                <section className="analytics-kpi-grid">
-                  {kpiCards.map((card) => {
-                    const canOpenCard = hasViewPermission(card.view);
+                <section className="analytics-kpi-sections">
+                  {dashboardKpiSections.map((section) => (
+                    <div className="analytics-kpi-section" key={section.title}>
+                      <h3>{section.title}</h3>
+                      <div className="analytics-kpi-grid">
+                        {section.cards.map((card) => {
+                          const canOpenCard = hasViewPermission(card.view);
 
-                    return (
-                      <article
-                        className={`analytics-kpi-card${canOpenCard ? " clickable" : ""}`}
-                        key={card.label}
-                        role={canOpenCard ? "button" : undefined}
-                        tabIndex={canOpenCard ? 0 : undefined}
-                        onClick={() => canOpenCard && openAdminView(card.view)}
-                        onKeyDown={(event) => {
-                          if (canOpenCard && (event.key === "Enter" || event.key === " ")) {
-                            event.preventDefault();
-                            openAdminView(card.view);
-                          }
-                        }}
-                      >
-                        <div className={`analytics-kpi-icon ${card.tone}`}>{card.icon}</div>
-                        <div>
-                          <span>{card.label}</span>
-                          <strong>{card.value}</strong>
-                          <small>{card.meta}</small>
-                        </div>
-                        <em>{card.trend}</em>
-                      </article>
-                    );
-                  })}
+                          return (
+                            <article
+                              className={`analytics-kpi-card${canOpenCard ? " clickable" : ""}`}
+                              key={card.label}
+                              role={canOpenCard ? "button" : undefined}
+                              tabIndex={canOpenCard ? 0 : undefined}
+                              onClick={() => canOpenCard && openAdminView(card.view)}
+                              onKeyDown={(event) => {
+                                if (canOpenCard && (event.key === "Enter" || event.key === " ")) {
+                                  event.preventDefault();
+                                  openAdminView(card.view);
+                                }
+                              }}
+                            >
+                              <div className={`analytics-kpi-icon ${card.tone}`}>{card.icon}</div>
+                              <div>
+                                <span>{card.label}</span>
+                                <strong>{card.value}</strong>
+                                <small>{card.meta}</small>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </section>
 
                 <section className="analytics-chart-grid">
@@ -8127,7 +8793,7 @@ export default function Home() {
                       </div>
                     </header>
                     {accessTypeGraph.length ? (
-                      <ResponsiveContainer height={280} width="100%">
+                      <ResponsiveContainer height={220} width="100%">
                         <PieChart>
                           <Pie animationDuration={800} data={accessTypeGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105} paddingAngle={3}>
                             {accessTypeGraph.map((entry, index) => (
@@ -8151,7 +8817,7 @@ export default function Home() {
                       </div>
                     </header>
                     {subscriptionStatusGraph.length ? (
-                      <ResponsiveContainer height={280} width="100%">
+                      <ResponsiveContainer height={220} width="100%">
                         <PieChart>
                           <Pie animationDuration={800} data={subscriptionStatusGraph} dataKey="count" innerRadius={72} nameKey="label" outerRadius={108} paddingAngle={4}>
                             {subscriptionStatusGraph.map((entry, index) => (
@@ -8175,15 +8841,15 @@ export default function Home() {
                       </div>
                     </header>
                     {revenueBreakdown.length ? (
-                      <ResponsiveContainer height={310} width="100%">
+                      <ResponsiveContainer height={250} width="100%">
                         <BarChart data={revenueBreakdown}>
-                          <CartesianGrid stroke="#e8edf5" vertical={false} />
-                          <XAxis dataKey="name" stroke="#64748b" />
-                          <YAxis stroke="#64748b" tickFormatter={(value) => `₹${value}`} />
+                          <CartesianGrid stroke={chartColors.grid} vertical={false} />
+                          <XAxis dataKey="name" stroke={chartColors.axis} />
+                          <YAxis stroke={chartColors.axis} tickFormatter={(value) => `₹${value}`} />
                           <Tooltip content={dashboardTooltip} />
                           <Legend />
-                          <Bar animationDuration={800} dataKey="subscriptionRevenue" fill="#1769e0" name="Subscription Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
-                          <Bar animationDuration={800} dataKey="cibilRepairRevenue" fill="#13a8a8" name="CIBIL Repair Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
+                          <Bar animationDuration={800} dataKey="subscriptionRevenue" fill={chartColors.blue} name="Subscription Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
+                          <Bar animationDuration={800} dataKey="cibilRepairRevenue" fill={chartColors.teal} name="CIBIL Repair Revenue" radius={[8, 8, 0, 0]} stackId="revenue" />
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
@@ -8199,15 +8865,15 @@ export default function Home() {
                       </div>
                     </header>
                     {hasFeedbackData ? (
-                      <ResponsiveContainer height={300} width="100%">
+                      <ResponsiveContainer height={240} width="100%">
                         <BarChart data={feedbackBars} layout="vertical">
-                          <CartesianGrid stroke="#e8edf5" horizontal={false} />
-                          <XAxis stroke="#64748b" type="number" />
-                          <YAxis dataKey="rating" stroke="#64748b" type="category" width={70} />
+                          <CartesianGrid stroke={chartColors.grid} horizontal={false} />
+                          <XAxis stroke={chartColors.axis} type="number" />
+                          <YAxis dataKey="rating" stroke={chartColors.axis} type="category" width={70} />
                           <Tooltip content={dashboardTooltip} />
                           <Bar animationDuration={800} dataKey="count" name="Ratings" radius={[0, 8, 8, 0]}>
                             {feedbackBars.map((entry) => (
-                              <Cell fill={entry.rating.startsWith("5") ? "#1769e0" : "#8fb5ef"} key={entry.rating} />
+                              <Cell fill={entry.rating.startsWith("5") ? chartColors.green : chartColors.mutedBlue} key={entry.rating} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -8225,7 +8891,7 @@ export default function Home() {
                       </div>
                     </header>
                     {repairStatusGraph.length ? (
-                      <ResponsiveContainer height={280} width="100%">
+                      <ResponsiveContainer height={220} width="100%">
                         <PieChart>
                           <Pie data={repairStatusGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105}>
                             {repairStatusGraph.map((entry, index) => (
@@ -8249,7 +8915,7 @@ export default function Home() {
                       </div>
                     </header>
                     {disputesStatusGraph.length ? (
-                      <ResponsiveContainer height={280} width="100%">
+                      <ResponsiveContainer height={220} width="100%">
                         <PieChart>
                           <Pie data={disputesStatusGraph} dataKey="count" innerRadius={70} nameKey="label" outerRadius={105}>
                             {disputesStatusGraph.map((entry, index) => (
@@ -8273,16 +8939,16 @@ export default function Home() {
                       </div>
                     </header>
                     {monthlyRecords.length ? (
-                      <ResponsiveContainer height={340} width="100%">
+                      <ResponsiveContainer height={270} width="100%">
                         <LineChart data={monthlyRecords}>
-                          <CartesianGrid stroke="#e8edf5" vertical={false} />
-                          <XAxis dataKey="label" stroke="#64748b" />
-                          <YAxis stroke="#64748b" />
+                          <CartesianGrid stroke={chartColors.grid} vertical={false} />
+                          <XAxis dataKey="label" stroke={chartColors.axis} />
+                          <YAxis stroke={chartColors.axis} />
                           <Tooltip content={dashboardTooltip} />
                           <Legend />
-                          <Line animationDuration={900} dataKey="users" dot={false} name="Users" stroke="#1769e0" strokeWidth={3} type="monotone" />
-                          <Line animationDuration={900} dataKey="messages" dot={false} name="Messages" stroke="#13a8a8" strokeWidth={3} type="monotone" />
-                          <Line animationDuration={900} dataKey="loans" dot={false} name="Loans" stroke="#f59e0b" strokeWidth={3} type="monotone" />
+                          <Line animationDuration={900} dataKey="users" dot={false} name="Users" stroke={chartColors.blue} strokeWidth={3} type="monotone" />
+                          <Line animationDuration={900} dataKey="messages" dot={false} name="Messages" stroke={chartColors.teal} strokeWidth={3} type="monotone" />
+                          <Line animationDuration={900} dataKey="loans" dot={false} name="Loans" stroke={chartColors.amber} strokeWidth={3} type="monotone" />
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
@@ -8479,93 +9145,6 @@ export default function Home() {
                   <button disabled={isNotificationSending || !notificationTitle || !notificationMessage} type="submit">
                     {isNotificationSending ? "Sending..." : "Send"}
                   </button>
-                </footer>
-              </form>
-            </section>
-          </div>
-        ) : null}
-        {isEmployeeModalOpen ? (
-          <div className="modal-backdrop">
-            <section className="plan-modal admin-plan-modal employee-modal">
-              <header>
-                <div>
-                  <h3>{editingEmployeeId ? "Edit Employee" : "Add Employee"}</h3>
-                  <p>Employee Management</p>
-                </div>
-                <button type="button" onClick={() => setIsEmployeeModalOpen(false)}>
-                  ×
-                </button>
-              </header>
-
-              <form className="admin-plan-form modal-plan-form" onSubmit={saveEmployee}>
-                <div className="admin-plan-grid">
-                  <label>
-                    Full Name
-                    <input required value={employeeForm.fullName} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, fullName: event.target.value }))} />
-                  </label>
-                  <label>
-                    Mobile Number
-                    <input required maxLength={10} value={employeeForm.mobileNumber} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, mobileNumber: event.target.value.replace(/\D/g, "") }))} />
-                  </label>
-                  <label>
-                    Email
-                    <input required type="email" value={employeeForm.email} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, email: event.target.value }))} />
-                  </label>
-                  <label>
-                    Role
-                    <select
-                      value={employeeForm.rolePublicId}
-                      onChange={(event) => {
-                        const role = employeeRoles.find((item) => item.publicId === event.target.value);
-                        setEmployeeForm((employee) => ({
-                          ...employee,
-                          rolePublicId: event.target.value,
-                          role: role?.roleName || "",
-                        }));
-                      }}
-                    >
-                      <option value="">Select Role</option>
-                      {employeeRoles.map((role) => (
-                        <option key={role.publicId} value={role.publicId}>
-                          {role.roleName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Department
-                    <input required value={employeeForm.department} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, department: event.target.value }))} />
-                  </label>
-                  <label>
-                    Designation
-                    <input required value={employeeForm.designation} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, designation: event.target.value }))} />
-                  </label>
-                  <label>
-                    Status
-                    <select value={employeeForm.status} onChange={(event) => setEmployeeForm((employee) => ({ ...employee, status: event.target.value }))}>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </label>
-                  <label>
-                    Joined At
-                    <DateFilter
-                      className="employee-joined-date"
-                      label="Joined At"
-                      value={employeeForm.joinedAt}
-                      onChange={(value) => setEmployeeForm((employee) => ({ ...employee, joinedAt: value }))}
-                    />
-                  </label>
-                </div>
-                <footer className="modal-actions">
-                  <button type="button" onClick={() => setIsEmployeeModalOpen(false)}>
-                    Cancel
-                  </button>
-                  {(editingEmployeeId ? canUpdateEmployees : canCreateEmployees) ? (
-                    <button disabled={isEmployeeSaving} type="submit">
-                      {isEmployeeSaving ? "Saving..." : editingEmployeeId ? "Update" : "Add"}
-                    </button>
-                  ) : null}
                 </footer>
               </form>
             </section>
@@ -9372,6 +9951,29 @@ function formatDate(value: string | null) {
   }
 
   return new Date(value).toLocaleDateString("en-IN");
+}
+
+function getTodayDateValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function isAnnouncementActive(announcement: AnnouncementRow) {
+  if (!announcement.startDate || !announcement.endDate) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const startDate = new Date(`${announcement.startDate.slice(0, 10)}T00:00:00`);
+  const endDate = new Date(`${announcement.endDate.slice(0, 10)}T00:00:00`);
+
+  return today >= startDate && today <= endDate;
 }
 
 function formatDateTime(value: string | null) {
